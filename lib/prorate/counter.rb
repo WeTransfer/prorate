@@ -2,9 +2,14 @@ module Prorate
   # The counter implements a rolling window throttling mechanism. At each call to incr(), the Redis time
   # is obtained. A counter then gets set at the key corresponding to the timestamp of the request, with a
   # granularity of a second. If requests are done continuously and in large volume, the counter will therefore
-  # create one key for each second of the given rolling window size. he counters per second are set to auto-expire
-  # after the window lapses. When incr() is performed, there is 
+  # create one key for each second of the given rolling window size.
+  # The counters per second are set to auto-expire once the the window lapses.
+  # The current state of the counters is retreived using MGET, in one Redis call.
   class Counter
+    # @param redis[Redis] a Redis connection
+    # @param logger[Logger] a Logger-conforming logger
+    # @param id[String] the unique identifier for this client/user
+    # @param window_size[Fixnum] the number of seconds the throttle should be in effect
     def initialize(redis:, logger: NullLogger, id:, window_size:)
       @redis = redis
       @logger = logger
@@ -15,6 +20,8 @@ module Prorate
     # Increments the throttle counter for this identifier, and returns the total number of requests
     # performed so far within the given time span. The caller can then determine whether the request has
     # to be throttled or can be let through.
+    #
+    # @return [Fixnum] the total number of calls the client has performed within the current open window
     def incr
       sec, _ = @redis.time # Use Redis time instead of the system timestamp, so that all the nodes are consistent
       ts = sec.to_i # All Redis results are strings
