@@ -26,6 +26,10 @@ Within your Rails controller:
     throttle_args[:block_for] ||= throttle_args.fetch(:period)
     t = Prorate::Throttle.new(redis: Redis.new, logger: Rails.logger,
         name: "throttle-login-email", limit: 20, period: 5.seconds)
+    # Add all the parameters that function as a discriminator
+    t << request.ip
+    t << params.require(:email)
+    # ...and call the throttle! method
     t.throttle! # Will raise a Prorate::Throttled exception if the limit has been reached
 
 To capture that exception, in the controller
