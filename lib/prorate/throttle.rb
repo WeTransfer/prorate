@@ -27,7 +27,7 @@ module Prorate
       redis.with do |r|
         logger.info { "Applying throttle counter %s" % name }
         bucket_capacity = limit # how many tokens can be in the bucket
-        leak_rate = period.to_f / limit # tokens per second;
+        leak_rate = limit.to_f / period # tokens per second;
         weight = 1 # how many tokens each request is worth
         resp = run_lua_throttler(redis: r, identifier: identifier, bucket_capacity: bucket_capacity, leak_rate: leak_rate, weight: weight, block_for: block_for)
 
