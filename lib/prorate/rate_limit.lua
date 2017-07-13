@@ -36,7 +36,7 @@ else
     retval = "OK"
   else
     redis.call("SET", block_key, now + block_duration)
-    redis.call("EXPIRE", bucket_key, block_duration)    
+    redis.call("EXPIRE", block_key, block_duration)
     retval = block_duration
   end
   redis.call("SET", bucket_key, new_count) --still needs to be saved
