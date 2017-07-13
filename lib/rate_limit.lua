@@ -23,7 +23,7 @@ end
 -- get current bucket level
 local count = tonumber(redis.call("GET", bucket_key))
 if count == nil then
-  --exit early because this throttle/identifier combo does not exist yet
+  -- exit early because this throttle/identifier combo does not exist yet
   redis.call("SET", bucket_key, weight) -- set bucket with initial value
   retval =  "OK"
 else
@@ -45,7 +45,7 @@ end
 -- update last_updated for this bucket, required in all branches
 redis.call("SET", last_updated_key, now)
 
---expiring keys is always required
+-- expiring keys is always required
 local key_lifetime = math.ceil(max_bucket_capacity / leak_rate)
 redis.call("EXPIRE", bucket_key, key_lifetime)
 redis.call("EXPIRE", last_updated_key, key_lifetime)
