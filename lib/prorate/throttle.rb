@@ -1,7 +1,8 @@
 require 'digest'
 
 module Prorate
-
+  class Throttled < StandardError
+  end
 
   class Throttle < Ks.strict(:name, :limit, :period, :block_for, :redis, :logger)
     def initialize(*)
