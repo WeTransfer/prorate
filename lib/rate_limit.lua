@@ -25,7 +25,7 @@ else
   local new_count = math.max(0, count - (leak_rate * ((now - last_updated))))
 
   if weight <= (max_bucket_capacity - new_count) then
-    new_count += weight
+    new_count = new_count + weight
     retval =  "OK"
   else
     retval =  "NOK"
