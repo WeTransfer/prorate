@@ -17,8 +17,8 @@ module Prorate
       identifier = [name, discriminator].join(':')
       
       redis.with do |r|
-        logger.info { "Checking throttle block %s" % name }
-        raise Throttled.new(block_for) if Prorate::BlockFor.blocked?(id: identifier, redis: r)
+        #logger.info { "Checking throttle block %s" % name }
+        #raise Throttled.new(block_for) if Prorate::BlockFor.blocked?(id: identifier, redis: r)
 
         logger.info { "Applying throttle counter %s" % name }
         # allowed request rate is limit per period
@@ -26,14 +26,14 @@ module Prorate
         bucket_capacity = limit # how many tokens can be in the bucket
         leak_rate = period / limit # tokens per second; 
         weight = 1 # how many tokens each request is worth
-        resp = r.evalsha('1de4cfce19e4c42b6087669d6a2e524d899a3c02', identifier, bucket_capacity, leak_rate, weight)
+        resp = r.evalsha('ac3eeb0e21c24a41442e44627ece11f182a1d382', [], [identifier, bucket_capacity, leak_rate, weight, block_for])
 
         #c = Prorate::Counter.new(redis: r, id: identifier, logger: logger, window_size: period)
         #after_increment = c.incr
-        if after_increment > limit
+        if resp != "OK"
           logger.warn { "Throttle %s exceeded limit of %d at %d" % [name, limit, after_increment] }
-          Prorate::BlockFor.block!(redis: r, id: identifier, duration: block_for)
-          raise Throttled.new(period)
+          #Prorate::BlockFor.block!(redis: r, id: identifier, duration: block_for)
+          raise Throttled.new(resp)
         end
       end
     end
