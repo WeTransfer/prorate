@@ -3,7 +3,7 @@ require 'securerandom'
 
 describe Prorate::Throttle do
   describe '#throttle!' do
-    let(:throttle_name) { 'leecher-%s' % SecureRandom.hex(2) }
+    let(:throttle_name) { 'leecher-%s' % SecureRandom.hex(4) }
     it 'throttles and raises an exception' do
       r = Redis.new
       t = Prorate::Throttle.new(redis: r, logger: Prorate::NullLogger, limit: 2, period: 2, block_for: 5, name: throttle_name)
@@ -74,6 +74,27 @@ describe Prorate::Throttle do
       expect(logger).to receive(:info).exactly(32).times.and_call_original
       32.times { t.throttle! }
       expect(buf.string).not_to be_empty
+    end
+
+    it 'reloads the lua script when needed' do
+      r = Redis.new
+      r.script(:flush)
+      t = Prorate::Throttle.new(redis: r, logger: Prorate::NullLogger, limit: 30, period: 10, block_for: 2, name: throttle_name)
+      expect(File).to receive(:read).and_call_original
+      expect(r).to receive(:evalsha).exactly(2).times.and_call_original
+      expect {
+        t.throttle!
+      }.not_to raise_error
+    end
+
+    it 'raises an error when the script hash is not what was expected' do
+      r = Redis.new
+      r.script(:flush)
+      t = Prorate::Throttle.new(redis: r, logger: Prorate::NullLogger, limit: 30, period: 10, block_for: 2, name: throttle_name)
+      expect(File).to receive(:read).and_return(' this is not my script :( ')
+      expect {
+        t.throttle!
+      }.to raise_error(Prorate::ScriptHashMismatch)
     end
   end
 end

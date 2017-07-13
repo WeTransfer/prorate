@@ -26,7 +26,6 @@ module Prorate
       
       redis.with do |r|
         logger.info { "Applying throttle counter %s" % name }
-        allowed_req_rate = period / limit
         bucket_capacity = limit # how many tokens can be in the bucket
         leak_rate = period.to_f / limit # tokens per second;
         weight = 1 # how many tokens each request is worth
