@@ -22,7 +22,7 @@ if count == nil then
 else
   -- if it already exists, do the leaky bucket thing
   local last_updated = tonumber(redis.call("GET", last_updated_key))
-  local new_count = math.max(0, count - (leak_rate * ((now - last_updated)))
+  local new_count = math.max(0, count - (leak_rate * ((now - last_updated))))
 
   if weight <= (max_bucket_capacity - new_count) then
     new_count += weight
