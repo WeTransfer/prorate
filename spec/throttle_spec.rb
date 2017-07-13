@@ -52,13 +52,13 @@ describe Prorate::Throttle do
         t = Prorate::Throttle.new(redis: r, logger: Prorate::NullLogger, limit: 4, period: 1, block_for: 2, name: throttle_name)
         t.throttle!
       end
-      
+      # bucket is now full; next request will overflow it
       expect {
         t = Prorate::Throttle.new(redis: r, logger: Prorate::NullLogger, limit: 4, period: 1, block_for: 1, name: throttle_name)
         t.throttle!
       }.to raise_error(Prorate::Throttled)
       
-      sleep 4 # 3 is still too short ????
+      sleep 1.5
       
       # This one should pass again
       t = Prorate::Throttle.new(redis: r, logger: Prorate::NullLogger, limit: 4, period: 1, block_for: 1, name: throttle_name)
