@@ -54,7 +54,6 @@ module Prorate
     end
 
     def run_lua_throttler(redis: , identifier: , bucket_capacity: , leak_rate: , block_for: )
-      # Slightly magic hash:
       redis.evalsha(CURRENT_SCRIPT_HASH, [], [identifier, bucket_capacity, leak_rate, block_for])
     rescue Redis::CommandError => e
       if e.message.include? "NOSCRIPT"
