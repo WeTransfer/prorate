@@ -126,7 +126,7 @@ describe Prorate::Throttle do
       expect(r.get(bucket_key)).not_to be_nil
       expect(r.get(last_updated_key)).not_to be_nil
       expect(r.get(block_key)).not_to be_nil
-      sleep 2
+      sleep 2.2
       # After <period> time elapses without anything happening, the keys can be deleted.
       # the block should still be there though
       expect(r.get(bucket_key)).to be_nil
