@@ -96,5 +96,47 @@ describe Prorate::Throttle do
         t.throttle!
       }.to raise_error(Prorate::ScriptHashMismatch)
     end
+
+    it 'does not keep keys around for longer than necessary' do
+      r = Redis.new
+      t = Prorate::Throttle.new(redis: r, logger: Prorate::NullLogger, limit: 2, period: 2, block_for: 3, name: throttle_name)
+
+      discriminator_string = Digest::SHA1.hexdigest(Marshal.dump([throttle_name]))
+      bucket_key = throttle_name + ':' + discriminator_string + '.value'
+      last_updated_key = throttle_name + ':' + discriminator_string + '.last_update'
+      block_key = throttle_name + ':' + discriminator_string + '.block'
+
+      # At the start all key should be empty
+      expect(r.get(bucket_key)).to be_nil
+      expect(r.get(last_updated_key)).to be_nil
+      expect(r.get(block_key)).to be_nil
+
+      2.times do
+        t.throttle!
+      end
+
+      # We are not blocked yet
+      expect(r.get(bucket_key)).not_to be_nil
+      expect(r.get(last_updated_key)).not_to be_nil
+      expect(r.get(block_key)).to be_nil
+      expect{
+        t.throttle!
+      }.to raise_error(Prorate::Throttled)
+      # Now the block key should be set as well, and the other two should still be set
+      expect(r.get(bucket_key)).not_to be_nil
+      expect(r.get(last_updated_key)).not_to be_nil
+      expect(r.get(block_key)).not_to be_nil
+      sleep 2
+      # After <period> time elapses without anything happening, the keys can be deleted.
+      # the block should still be there though
+      expect(r.get(bucket_key)).to be_nil
+      expect(r.get(last_updated_key)).to be_nil
+      expect(r.get(block_key)).not_to be_nil
+      sleep 1
+      # Now the block should be gone as well
+      expect(r.get(bucket_key)).to be_nil
+      expect(r.get(last_updated_key)).to be_nil
+      expect(r.get(block_key)).to be_nil
+    end
   end
 end
