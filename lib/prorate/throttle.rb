@@ -7,13 +7,18 @@ module Prorate
   class ScriptHashMismatch < StandardError
   end
 
+  class MisconfiguredThrottle < StandardError
+  end
+
   class Throttle < Ks.strict(:name, :limit, :period, :block_for, :redis, :logger)
-    CURRENT_SCRIPT_HASH = 'bff6e84152081bd6a1386773dc3dec0a04b8f561'
+    CURRENT_SCRIPT_HASH = 'fec1e501aaf0a47b8778e46bdb7d0945527e8c0c'
 
     def initialize(*)
       super
       @discriminators = [name.to_s]
       self.redis = NullPool.new(redis) unless redis.respond_to?(:with)
+      raise MisconfiguredThrottle if ((period <= 0) || (limit <= 0))
+      @leak_rate = limit.to_f / period # tokens per second;
     end
     
     def <<(discriminator)
@@ -26,10 +31,7 @@ module Prorate
       
       redis.with do |r|
         logger.info { "Applying throttle counter %s" % name }
-        bucket_capacity = limit # how many tokens can be in the bucket
-        leak_rate = limit.to_f / period # tokens per second;
-        weight = 1 # how many tokens each request is worth
-        resp = run_lua_throttler(redis: r, identifier: identifier, bucket_capacity: bucket_capacity, leak_rate: leak_rate, weight: weight, block_for: block_for)
+        resp = run_lua_throttler(redis: r, identifier: identifier, bucket_capacity: limit, leak_rate: @leak_rate, weight: 1, block_for: block_for)
 
         if resp != "OK"
           logger.warn { "Throttle %s exceeded limit of %d at %d" % [name, limit, after_increment] }
