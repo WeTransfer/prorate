@@ -20,13 +20,13 @@ times = []
     t = Prorate::Throttle.new(redis: r, logger: logz, name: "throttle-login-email", limit: 60, period: 120, block_for: 5)
     # Add all the parameters that function as a discriminator
     t << '127.0.2.1'
-    t << 'onno@wetransfer.com'
+    t << 'no_person@nowhere.com'
     t.throttle!
   }
 end
 
-
 puts average_ms times
+
 times = []
 15.times do
   email = SecureRandom.hex(20)
