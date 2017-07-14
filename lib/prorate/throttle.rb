@@ -38,12 +38,13 @@ module Prorate
       
       redis.with do |r|
         logger.info { "Applying throttle counter %s" % name }
-        resp = run_lua_throttler(redis: r, identifier: identifier, bucket_capacity: limit, leak_rate: @leak_rate, block_for: block_for)
+        remaining_block_time, bucket_level = run_lua_throttler(redis: r, identifier: identifier, bucket_capacity: limit, leak_rate: @leak_rate, block_for: block_for)
 
-        if resp != "OK"
+        if remaining_block_time > 0
           logger.warn { "Throttle %s exceeded limit of %d at %d" % [name, limit, after_increment] }
-          raise Throttled.new("Throttled, please lower your temper and try again in #{resp} seconds")
+          raise Throttled.new("Throttled, please lower your temper and try again in #{remaining_block_time} seconds")
         end
+        available_calls = limit - bucket_level
       end
     end
 

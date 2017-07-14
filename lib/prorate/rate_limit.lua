@@ -1,6 +1,8 @@
 -- Single threaded Leaky Bucket implementation.
--- args: key_base, leak_rate, max_bucket_capacity, weight, block_duration
--- returns: either "OK" or the amount of seconds until the block expires
+-- args: key_base, leak_rate, max_bucket_capacity, block_duration
+-- returns: an array of two integers, the first of which indicates the remaining block time.
+-- if the block time is nonzero, the second integer is always zero. If the block time is zero,
+-- the second integer indicates the level of the bucket
 
 -- this is required to be able to use TIME and writes; basically it lifts the script into IO
 redis.replicate_commands()
@@ -18,7 +20,7 @@ local key_lifetime = math.ceil(max_bucket_capacity / leak_rate)
 
 local blocked_until = redis.call("GET", block_key)
 if blocked_until then
-  return (tonumber(blocked_until) - now)
+  return {(tonumber(blocked_until) - now), 0}
 end
 
 -- get current bucket level
@@ -26,7 +28,7 @@ local count = tonumber(redis.call("GET", bucket_key))
 if count == nil then
   -- this throttle/identifier combo does not exist yet, so much calculation can be skipped
   redis.call("SETEX", bucket_key, key_lifetime, 1) -- set bucket with initial value
-  retval =  "OK"
+  retval =  {0, 1}
 else
   -- if it already exists, do the leaky bucket thing
   local last_updated = tonumber(redis.call("GET", last_updated_key))
@@ -34,10 +36,10 @@ else
 
   if new_count < max_bucket_capacity then
     new_count = new_count + 1
-    retval = "OK"
+    retval = {0, math.ceil(new_count)}
   else
     redis.call("SETEX", block_key, block_duration, now + block_duration)
-    retval = block_duration
+    retval = {block_duration, 0}
   end
   redis.call("SETEX", bucket_key, key_lifetime, new_count) --still needs to be saved
 end
