@@ -2,6 +2,11 @@ require 'digest'
 
 module Prorate
   class Throttled < StandardError
+    attr_reader :retry_in_seconds
+    def initialize(try_again_in)
+      @retry_in_seconds = try_again_in
+      super("Throttled, please lower your temper and try again in #{retry_in_seconds} seconds")
+    end
   end
 
   class ScriptHashMismatch < StandardError
@@ -41,8 +46,8 @@ module Prorate
         remaining_block_time, bucket_level = run_lua_throttler(redis: r, identifier: identifier, bucket_capacity: limit, leak_rate: @leak_rate, block_for: block_for)
 
         if remaining_block_time > 0
-          logger.warn { "Throttle %s exceeded limit of %d at %d" % [name, limit, after_increment] }
-          raise Throttled.new("Throttled, please lower your temper and try again in #{remaining_block_time} seconds")
+          logger.warn { "Throttle %s exceeded limit of %d in %d seconds and is blocked for the next %d seconds" % [name, limit, period, remaining_block_time] }
+          raise Throttled.new(remaining_block_time)
         end
         available_calls = limit - bucket_level
       end
