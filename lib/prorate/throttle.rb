@@ -11,7 +11,7 @@ module Prorate
   end
 
   class Throttle < Ks.strict(:name, :limit, :period, :block_for, :redis, :logger)
-    CURRENT_SCRIPT_HASH = 'fec1e501aaf0a47b8778e46bdb7d0945527e8c0c'
+    CURRENT_SCRIPT_HASH = '7ed6b760cce6cc70cf74b48ad20bd5b5b202f988'
 
     def initialize(*)
       super
@@ -31,7 +31,7 @@ module Prorate
       
       redis.with do |r|
         logger.info { "Applying throttle counter %s" % name }
-        resp = run_lua_throttler(redis: r, identifier: identifier, bucket_capacity: limit, leak_rate: @leak_rate, weight: 1, block_for: block_for)
+        resp = run_lua_throttler(redis: r, identifier: identifier, bucket_capacity: limit, leak_rate: @leak_rate, block_for: block_for)
 
         if resp != "OK"
           logger.warn { "Throttle %s exceeded limit of %d at %d" % [name, limit, after_increment] }
@@ -40,9 +40,9 @@ module Prorate
       end
     end
 
-    def run_lua_throttler(redis: , identifier: , bucket_capacity: , leak_rate: , weight: , block_for: )
+    def run_lua_throttler(redis: , identifier: , bucket_capacity: , leak_rate: , block_for: )
       # Slightly magic hash:
-      redis.evalsha(CURRENT_SCRIPT_HASH, [], [identifier, bucket_capacity, leak_rate, weight, block_for])
+      redis.evalsha(CURRENT_SCRIPT_HASH, [], [identifier, bucket_capacity, leak_rate, block_for])
     rescue Redis::CommandError => e
       if e.message.include? "NOSCRIPT"
         # The Redis server has never seen this script before. Needs to run only once in the entire lifetime of the Redis server (unless the script changes)
@@ -50,7 +50,7 @@ module Prorate
         script = File.read(script_filepath)
         raise ScriptHashMismatch if Digest::SHA1.hexdigest(script) != CURRENT_SCRIPT_HASH
         redis.script(:load, script)
-        redis.evalsha(CURRENT_SCRIPT_HASH, [], [identifier, bucket_capacity, leak_rate, weight, block_for])
+        redis.evalsha(CURRENT_SCRIPT_HASH, [], [identifier, bucket_capacity, leak_rate, block_for])
       else
         raise e
       end
