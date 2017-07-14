@@ -15,6 +15,8 @@ local weight = tonumber(ARGV[4])
 local block_duration = tonumber(ARGV[5])
 local now = tonumber(redis.call("TIME")[1]) --unix timestamp, will be required in all paths
 
+local key_lifetime = math.ceil(max_bucket_capacity / leak_rate)
+
 local blocked_until = redis.call("GET", block_key)
 if blocked_until then
   return (tonumber(blocked_until) - now)
@@ -24,7 +26,7 @@ end
 local count = tonumber(redis.call("GET", bucket_key))
 if count == nil then
   -- exit early because this throttle/identifier combo does not exist yet
-  redis.call("SET", bucket_key, weight) -- set bucket with initial value
+  redis.call("SETEX", bucket_key, key_lifetime, weight) -- set bucket with initial value
   retval =  "OK"
 else
   -- if it already exists, do the leaky bucket thing
@@ -35,19 +37,13 @@ else
     new_count = new_count + weight
     retval = "OK"
   else
-    redis.call("SET", block_key, now + block_duration)
-    redis.call("EXPIRE", block_key, block_duration)
+    redis.call("SETEX", block_key, block_duration, now + block_duration)
     retval = block_duration
   end
-  redis.call("SET", bucket_key, new_count) --still needs to be saved
+  redis.call("SETEX", bucket_key, key_lifetime, new_count) --still needs to be saved
 end
 
 -- update last_updated for this bucket, required in all branches
-redis.call("SET", last_updated_key, now)
-
--- expiring keys is always required
-local key_lifetime = math.ceil(max_bucket_capacity / leak_rate)
-redis.call("EXPIRE", bucket_key, key_lifetime)
-redis.call("EXPIRE", last_updated_key, key_lifetime)
+redis.call("SETEX", last_updated_key, key_lifetime, now)
 
 return retval
