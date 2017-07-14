@@ -11,7 +11,14 @@ module Prorate
   end
 
   class Throttle < Ks.strict(:name, :limit, :period, :block_for, :redis, :logger)
-    CURRENT_SCRIPT_HASH = '7ed6b760cce6cc70cf74b48ad20bd5b5b202f988'
+
+    def self.get_script_hash
+      script_filepath = File.join(__dir__,"rate_limit.lua")
+      script = File.read(script_filepath)
+      Digest::SHA1.hexdigest(script)
+    end
+
+    CURRENT_SCRIPT_HASH = get_script_hash
 
     def initialize(*)
       super
