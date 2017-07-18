@@ -8,8 +8,8 @@
 redis.replicate_commands()
 -- make some nicer looking variable names:
 local retval = nil
-local bucket_key = ARGV[1] .. ".value"
-local last_updated_key = ARGV[1] .. ".last_update"
+local bucket_level_key = ARGV[1] .. ".bucket_level"
+local last_updated_key = ARGV[1] .. ".last_updated"
 local block_key = ARGV[1] .. ".block"
 local max_bucket_capacity = tonumber(ARGV[2])
 local leak_rate = tonumber(ARGV[3])
@@ -24,24 +24,24 @@ if blocked_until then
 end
 
 -- get current bucket level
-local count = tonumber(redis.call("GET", bucket_key))
-if count == nil then
+local bucket_level = tonumber(redis.call("GET", bucket_level_key))
+if not bucket_level then
   -- this throttle/identifier combo does not exist yet, so much calculation can be skipped
-  redis.call("SETEX", bucket_key, key_lifetime, 1) -- set bucket with initial value
+  redis.call("SETEX", bucket_level_key, key_lifetime, 1) -- set bucket with initial value
   retval =  {0, 1}
 else
   -- if it already exists, do the leaky bucket thing
-  local last_updated = tonumber(redis.call("GET", last_updated_key))
-  local new_count = math.max(0, count - (leak_rate * ((now - last_updated))))
+  local last_updated = tonumber(redis.call("GET", last_updated_key)) or now -- use sensible default of 'now' if the key does not exist
+  local new_bucket_level = math.max(0, bucket_level - (leak_rate * (now - last_updated)))
 
-  if new_count < max_bucket_capacity then
-    new_count = new_count + 1
-    retval = {0, math.ceil(new_count)}
+  if (new_bucket_level + 1) <= max_bucket_capacity then
+    new_bucket_level = new_bucket_level + 1
+    retval = {0, math.ceil(new_bucket_level)}
   else
     redis.call("SETEX", block_key, block_duration, now + block_duration)
     retval = {block_duration, 0}
   end
-  redis.call("SETEX", bucket_key, key_lifetime, new_count) --still needs to be saved
+  redis.call("SETEX", bucket_level_key, key_lifetime, new_bucket_level) --still needs to be saved
 end
 
 -- update last_updated for this bucket, required in all branches
