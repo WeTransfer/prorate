@@ -2,6 +2,15 @@ require 'spec_helper'
 require 'securerandom'
 
 describe Prorate::Throttle do
+  describe 'the Throttled exception' do
+    it 'carries the remaining block time around' do
+      e = Prorate::Throttled.new(10)
+      expect(e.retry_in_seconds).to eq(10)
+      expect(e.message).to include('10')
+    end
+
+  end
+
   describe '#throttle!' do
     let(:throttle_name) { 'leecher-%s' % SecureRandom.hex(4) }
     it 'throttles and raises an exception' do
