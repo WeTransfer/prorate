@@ -2,7 +2,7 @@
 
 Provides a low-level time-based throttle. Is mainly meant for situations where using something like Rack::Attack is not very
 useful since you need access to more variables. Under the hood, this uses a Lua script that implements the
-[Leaking Bucket](https://en.wikipedia.org/wiki/Leaky_bucket) algorithm in a single threaded and race condition safe way.
+[Leaky Bucket](https://en.wikipedia.org/wiki/Leaky_bucket) algorithm in a single threaded and race condition safe way.
 
 ## Installation
 
