@@ -102,8 +102,8 @@ describe Prorate::Throttle do
       t = Prorate::Throttle.new(redis: r, logger: Prorate::NullLogger, limit: 2, period: 2, block_for: 3, name: throttle_name)
 
       discriminator_string = Digest::SHA1.hexdigest(Marshal.dump([throttle_name]))
-      bucket_key = throttle_name + ':' + discriminator_string + '.value'
-      last_updated_key = throttle_name + ':' + discriminator_string + '.last_update'
+      bucket_key = throttle_name + ':' + discriminator_string + '.bucket_level'
+      last_updated_key = throttle_name + ':' + discriminator_string + '.last_updated'
       block_key = throttle_name + ':' + discriminator_string + '.block'
 
       # At the start all key should be empty
