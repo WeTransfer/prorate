@@ -6,7 +6,7 @@ require 'redis'
 require 'securerandom'
 
 def average_ms(ary)
-  ary.map{|x| x*1000}.inject(0,&:+) / ary.length
+  ary.map { |x| x * 1000 }.inject(0, &:+) / ary.length
 end
 
 r = Redis.new
@@ -31,24 +31,23 @@ end
 puts average_ms times
 def key_for_ts(ts)
   "th:%s:%d" % [@id, ts]
-end 
+end
 
 times = []
 15.times do
-  id = SecureRandom.hex(10)
   sec, _ = r.time # Use Redis time instead of the system timestamp, so that all the nodes are consistent
   ts = sec.to_i # All Redis results are strings
   k = key_for_ts(ts)
   times << Benchmark.realtime {
     r.multi do |txn|
-      # Increment the counter 
+      # Increment the counter
       txn.incr(k)
       txn.expire(k, 120)
 
       span_start = ts - 120
       span_end = ts + 1
-      possible_keys = (span_start..span_end).map{|prev_time| key_for_ts(prev_time) }
-            
+      possible_keys = (span_start..span_end).map { |prev_time| key_for_ts(prev_time) }
+
       # Fetch all the counter values within the time window. Despite the fact that this
       # will return thousands of elements for large sliding window sizes, the values are
       # small and an MGET in Redis is pretty cheap, so perf should stay well within limits.
@@ -58,4 +57,3 @@ times = []
 end
 
 puts average_ms times
-

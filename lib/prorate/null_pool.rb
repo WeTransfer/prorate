@@ -1,5 +1,7 @@
 module Prorate
   class NullPool < Struct.new(:conn)
-    def with; yield conn; end
+    def with
+      yield conn
+    end
   end
 end
