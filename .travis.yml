@@ -10,6 +10,5 @@ dist: trusty # https://docs.travis-ci.com/user/trusty-ci-environment/
 sudo: false
 cache: bundler
 
-# Travis permits the following phases: before_install, install, after_install, before_script, script, after_script
 script:
-  - bundle exec rspec
+  - bundle exec rake
