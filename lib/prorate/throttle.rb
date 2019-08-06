@@ -1,14 +1,6 @@
 require 'digest'
 
 module Prorate
-  class Throttled < StandardError
-    attr_reader :retry_in_seconds
-    def initialize(try_again_in)
-      @retry_in_seconds = try_again_in
-      super("Throttled, please lower your temper and try again in #{retry_in_seconds} seconds")
-    end
-  end
-
   class ScriptHashMismatch < StandardError
   end
 
@@ -46,7 +38,7 @@ module Prorate
 
         if remaining_block_time > 0
           logger.warn { "Throttle %s exceeded limit of %d in %d seconds and is blocked for the next %d seconds" % [name, limit, period, remaining_block_time] }
-          raise Throttled, remaining_block_time
+          raise ::Prorate::Throttled.new(name, remaining_block_time)
         end
         return limit - bucket_level # How many calls remain
       end

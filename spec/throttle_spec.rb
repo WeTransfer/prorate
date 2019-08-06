@@ -3,10 +3,19 @@ require 'securerandom'
 
 describe Prorate::Throttle do
   describe 'the Throttled exception' do
-    it 'carries the remaining block time around' do
-      e = Prorate::Throttled.new(10)
+    it 'carries the remaining block time and the name of the throttle' do
+      e = Prorate::Throttled.new("trigger-warnings", 10)
       expect(e.retry_in_seconds).to eq(10)
+      expect(e.throttle_name).to eq("trigger-warnings")
+
+      # The error message is _likely_ to be included in the HTTP response,
+      # so it makes sense for it to contain the retry_in value
       expect(e.message).to include('10')
+
+      # However the name of the throttle is secure material since
+      # it would be revealing the logic/purpose of the throttle that fired,
+      # and that sort of information should not leak into the exception message
+      expect(e.message).not_to include('trigger-warnings')
     end
   end
 
