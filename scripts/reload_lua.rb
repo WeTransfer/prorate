@@ -2,5 +2,5 @@
 require 'redis'
 r = Redis.new
 script = File.read('../lib/prorate/rate_limit.lua')
-sha = r.script(:load,script)
+sha = r.script(:load, script)
 puts sha

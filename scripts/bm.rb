@@ -6,7 +6,7 @@ require 'redis'
 require 'securerandom'
 
 def average_ms(ary)
-  ary.map{|x| x*1000}.inject(0,&:+) / ary.length
+  ary.map { |x| x * 1000 }.inject(0, &:+) / ary.length
 end
 
 r = Redis.new

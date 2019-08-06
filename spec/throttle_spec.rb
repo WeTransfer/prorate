@@ -8,7 +8,6 @@ describe Prorate::Throttle do
       expect(e.retry_in_seconds).to eq(10)
       expect(e.message).to include('10')
     end
-
   end
 
   describe '#throttle!' do
@@ -25,7 +24,7 @@ describe Prorate::Throttle do
         t.throttle!
       }.to raise_error(Prorate::Throttled)
     end
-    
+
     it 'uses the given parameters to differentiate between users' do
       r = Redis.new
       4.times { |i|
@@ -66,14 +65,14 @@ describe Prorate::Throttle do
         t = Prorate::Throttle.new(redis: r, logger: Prorate::NullLogger, limit: 4, period: 1, block_for: 1, name: throttle_name)
         t.throttle!
       }.to raise_error(Prorate::Throttled)
-      
+
       sleep 1.5
-      
+
       # This one should pass again
       t = Prorate::Throttle.new(redis: r, logger: Prorate::NullLogger, limit: 4, period: 1, block_for: 1, name: throttle_name)
       t.throttle!
     end
-    
+
     it 'logs all the things' do
       buf = StringIO.new
       logger = Logger.new(buf)
@@ -128,7 +127,7 @@ describe Prorate::Throttle do
       expect(r.get(bucket_key)).not_to be_nil
       expect(r.get(last_updated_key)).not_to be_nil
       expect(r.get(block_key)).to be_nil
-      expect{
+      expect {
         t.throttle!
       }.to raise_error(Prorate::Throttled)
       # Now the block key should be set as well, and the other two should still be set
