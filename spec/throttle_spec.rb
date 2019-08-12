@@ -136,25 +136,14 @@ describe Prorate::Throttle do
       expect(buf.string).not_to be_empty
     end
 
-    it 'reloads the lua script when needed' do
+    it 'loads the lua script into Redis if necessary' do
       r = Redis.new
       r.script(:flush)
       t = Prorate::Throttle.new(redis: r, logger: Prorate::NullLogger, limit: 30, period: 10, block_for: 2, name: throttle_name)
-      expect(File).to receive(:read).and_call_original
       expect(r).to receive(:evalsha).exactly(2).times.and_call_original
       expect {
         t.throttle!
       }.not_to raise_error
-    end
-
-    it 'raises an error when the script hash is not what was expected' do
-      r = Redis.new
-      r.script(:flush)
-      t = Prorate::Throttle.new(redis: r, logger: Prorate::NullLogger, limit: 30, period: 10, block_for: 2, name: throttle_name)
-      expect(File).to receive(:read).and_return(' this is not my script :( ')
-      expect {
-        t.throttle!
-      }.to raise_error(Prorate::ScriptHashMismatch)
     end
 
     it 'does not keep keys around for longer than necessary' do

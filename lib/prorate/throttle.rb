@@ -1,20 +1,12 @@
 require 'digest'
 
 module Prorate
-  class ScriptHashMismatch < StandardError
-  end
-
   class MisconfiguredThrottle < StandardError
   end
 
   class Throttle < Ks.strict(:name, :limit, :period, :block_for, :redis, :logger)
-    def self.lua_script_hash
-      script_filepath = File.join(__dir__, "rate_limit.lua")
-      script = File.read(script_filepath)
-      Digest::SHA1.hexdigest(script)
-    end
-
-    CURRENT_SCRIPT_HASH = lua_script_hash
+    LUA_SCRIPT_CODE = File.read(File.join(__dir__, "rate_limit.lua"))
+    LUA_SCRIPT_HASH = Digest::SHA1.hexdigest(LUA_SCRIPT_CODE)
 
     def initialize(*)
       super
@@ -108,23 +100,16 @@ module Prorate
     private
 
     def run_lua_throttler(redis:, identifier:, bucket_capacity:, leak_rate:, block_for:, n_tokens:)
-      redis.evalsha(CURRENT_SCRIPT_HASH, [], [identifier, bucket_capacity, leak_rate, block_for, n_tokens])
+      redis.evalsha(LUA_SCRIPT_HASH, [], [identifier, bucket_capacity, leak_rate, block_for, n_tokens])
     rescue Redis::CommandError => e
       if e.message.include? "NOSCRIPT"
-        force_load_lua_throttler_script(redis)
+        # The Redis server has never seen this script before. Needs to run only once in the entire lifetime
+        # of the Redis server, until the script changes - in which case it will be loaded under a different SHA
+        redis.script(:load, LUA_SCRIPT_CODE)
         retry
       else
         raise e
       end
-    end
-
-    # The Redis server has never seen this script before. Needs to run only once in the entire lifetime
-    # of the Redis server, until the script changes - in which case it will be loaded under a different SHA
-    def force_load_lua_throttler_script(into_redis)
-      lua_script_filepath = File.join(__dir__, "rate_limit.lua")
-      lua_script_source = File.read(lua_script_filepath)
-      raise ScriptHashMismatch if Digest::SHA1.hexdigest(lua_script_source) != CURRENT_SCRIPT_HASH
-      into_redis.script(:load, lua_script_source)
     end
   end
 end
