@@ -35,7 +35,7 @@ local last_updated = tonumber(redis.call("GET", last_updated_key)) or now -- use
 local new_bucket_level = math.max(0, bucket_level - (leak_rate * (now - last_updated)))
 
 if (new_bucket_level + n_tokens) <= max_bucket_capacity then
-  new_bucket_level = new_bucket_level + n_tokens
+  new_bucket_level = math.max(0, new_bucket_level + n_tokens)
   retval = {0, math.ceil(new_bucket_level)}
 else
   redis.call("SETEX", block_key, block_duration, now + block_duration)

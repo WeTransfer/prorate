@@ -57,6 +57,26 @@ describe Prorate::Throttle do
       }.to raise_error(Prorate::Throttled)
     end
 
+    it 'with a negative n_tokens keeps remaining calls at limit: value even if it would go above' do
+      r = Redis.new
+      t = Prorate::Throttle.new(redis: r, logger: Prorate::NullLogger, limit: 8, period: 2, block_for: 5, name: throttle_name)
+      t << 'some-id'
+
+      expect(t.throttle!(n_tokens: 0)).to eq(8)
+      expect(t.throttle!(n_tokens: -2)).to eq(8)
+      expect(t.throttle!(n_tokens: 1)).to eq(7)
+    end
+
+    it 'with a negative n_tokens allows "dripping" one token out' do
+      r = Redis.new
+      t = Prorate::Throttle.new(redis: r, logger: Prorate::NullLogger, limit: 8, period: 2, block_for: 5, name: throttle_name)
+      t << 'some-id'
+
+      expect(t.throttle!(n_tokens: 0)).to eq(8)
+      expect(t.throttle!(n_tokens: 1)).to eq(7)
+      expect(t.throttle!(n_tokens: -1)).to eq(8)
+    end
+
     it 'uses the given parameters to differentiate between users' do
       r = Redis.new
       4.times { |i|
