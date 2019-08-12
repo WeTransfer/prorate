@@ -21,6 +21,7 @@ describe Prorate::Throttle do
 
   describe '#throttle!' do
     let(:throttle_name) { 'leecher-%s' % SecureRandom.hex(4) }
+
     it 'throttles and raises an exception' do
       r = Redis.new
       t = Prorate::Throttle.new(redis: r, logger: Prorate::NullLogger, limit: 2, period: 2, block_for: 5, name: throttle_name)
@@ -31,6 +32,28 @@ describe Prorate::Throttle do
       t.throttle!
       expect {
         t.throttle!
+      }.to raise_error(Prorate::Throttled)
+    end
+
+    it 'with n_tokens of 0 simply keeps track of the throttle but does not trigger it' do
+      r = Redis.new
+      t = Prorate::Throttle.new(redis: r, logger: Prorate::NullLogger, limit: 2, period: 2, block_for: 5, name: throttle_name)
+      t << 'request-id'
+      t << 'user-id'
+
+      expect(t.throttle!(n_tokens: 0)).to eq(2)
+      expect(t.throttle!(n_tokens: 0)).to eq(2)
+      expect(t.throttle!).to eq(1)
+    end
+
+    it 'with n_tokens of 20 immediately triggers, already on the first call' do
+      r = Redis.new
+      t = Prorate::Throttle.new(redis: r, logger: Prorate::NullLogger, limit: 2, period: 2, block_for: 5, name: throttle_name)
+      t << 'request-id'
+      t << 'user-id'
+
+      expect {
+        t.throttle!(n_tokens: 20)
       }.to raise_error(Prorate::Throttled)
     end
 
@@ -88,7 +111,7 @@ describe Prorate::Throttle do
       logger.level = 0
       r = Redis.new
       t = Prorate::Throttle.new(redis: r, logger: logger, limit: 64, period: 15, block_for: 30, name: throttle_name)
-      expect(logger).to receive(:info).exactly(32).times.and_call_original
+      expect(logger).to receive(:debug).exactly(32).times.and_call_original
       32.times { t.throttle! }
       expect(buf.string).not_to be_empty
     end

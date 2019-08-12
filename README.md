@@ -35,6 +35,7 @@ Within your Rails controller:
 To capture that exception, in the controller
 
     rescue_from Prorate::Throttled do |e|
+      response.set_header('Retry-In', e.retry_in_seconds.to_s)
       render nothing: true, status: 429
     end
 
