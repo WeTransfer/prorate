@@ -4,6 +4,9 @@ Provides a low-level time-based throttle. Is mainly meant for situations where u
 useful since you need access to more variables. Under the hood, this uses a Lua script that implements the
 [Leaky Bucket](https://en.wikipedia.org/wiki/Leaky_bucket) algorithm in a single threaded and race condition safe way.
 
+[![Build Status](https://travis-ci.org/WeTransfer/prorate.svg?branch=master)](https://travis-ci.org/WeTransfer/prorate)
+[![Gem Version](https://badge.fury.io/rb/prorate.svg)](https://badge.fury.io/rb/prorate)
+
 ## Installation
 
 Add this line to your application's Gemfile:
