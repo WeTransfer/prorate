@@ -59,10 +59,9 @@ module Prorate
     #    Throttle A: [-------]    *(A not triggered)
     #    Throttle C: [------------|------------------]
     #
-    # To achieve that you can keep Throttle C alive using #ping!, on every check
-    # that touches Throttle A and/or Throttle C. A ping is effectively
-    # a throttle! call with `n_tokens` of 0 (keeps the leaky bucket registered
-    # but does not add any tokens to it):
+    # To achieve that you can keep Throttle C alive using `throttle!(n_tokens: 0)`,
+    # on every check that touches Throttle A and/or Throttle C. It keeps the leaky bucket
+    # updated but does not add any tokens to it:
     #
     #    Throttle A: [------]    *(A not triggered since block period has ended)
     #    Throttle C: [-----------|(ping)------------------]  C is still blocking
