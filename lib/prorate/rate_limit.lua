@@ -1,5 +1,5 @@
 -- Single threaded Leaky Bucket implementation.
--- args: key_base, leak_rate, max_bucket_capacity, block_duration
+-- args: key_base, leak_rate, max_bucket_capacity, block_duration, n_tokens
 -- returns: an array of two integers, the first of which indicates the remaining block time.
 -- if the block time is nonzero, the second integer is always zero. If the block time is zero,
 -- the second integer indicates the level of the bucket
