@@ -203,7 +203,7 @@ describe Prorate::Throttle do
       )
     }
 
-    context 'when never triggered'  do
+    context 'when never triggered' do
       it 'returns false' do
         expect(throttle.throttled?).to eq false
       end
@@ -218,18 +218,67 @@ describe Prorate::Throttle do
       end
     end
 
-    context 'when throttled'  do
+    context 'when throttled' do
       it 'returns true' do
         throttle << 'request-id'
         throttle.throttle!
         throttle.throttle!
         begin
           throttle.throttle!
-        rescue  Prorate::Throttled
+        rescue Prorate::Throttled
           # noop
         end
 
         expect(throttle.throttled?).to eq true
+      end
+    end
+  end
+
+  describe '#remaining_throttle_seconds' do
+    let(:throttle_name) { 'remaining-%s' % SecureRandom.hex(4) }
+    let(:redis) { Redis.new }
+    let(:block_time) { 20 }
+    let(:throttle) {
+      Prorate::Throttle.new(
+        redis: redis,
+        logger: Prorate::NullLogger,
+        limit: 2,
+        period: 2,
+        block_for: block_time,
+        name: throttle_name
+      )
+    }
+
+    context 'when never triggered' do
+      it 'returns 0' do
+        expect(throttle.remaining_throttle_seconds).to eq 0
+      end
+    end
+
+    context 'when triggered, but not throttled' do
+      it 'returns 0' do
+        throttle << 'request-id'
+        throttle.throttle!
+
+        expect(throttle.remaining_throttle_seconds).to eq 0
+      end
+    end
+
+    context 'when throttled' do
+      it 'returns the remaining block time' do
+        throttle << 'request-id'
+        throttle.throttle!
+        throttle.throttle!
+        begin
+          throttle.throttle!
+        rescue Prorate::Throttled
+          # noop
+        end
+
+        # expecting a value close, but not exactly the block time.
+        # This way, we allow for a small time difference between our Ruby
+        # process and our Redis server (and rounding errors)
+        expect(throttle.remaining_throttle_seconds).to be_within(1).of(block_time)
       end
     end
   end

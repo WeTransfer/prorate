@@ -105,6 +105,18 @@ module Prorate
       end
     end
 
+    def remaining_throttle_seconds
+      discriminator = Digest::SHA1.hexdigest(Marshal.dump(@discriminators))
+      identifier = [name, discriminator].join(':')
+
+      redis.with do |r|
+        remaining_seconds = r.get("#{identifier}.block").to_i
+        return 0 unless remaining_seconds > 0
+
+        remaining_seconds - Time.now.to_i
+      end
+    end
+
     private
 
     def run_lua_throttler(redis:, identifier:, bucket_capacity:, leak_rate:, block_for:, n_tokens:)
