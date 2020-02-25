@@ -96,6 +96,15 @@ module Prorate
       end
     end
 
+    def throttled?
+      discriminator = Digest::SHA1.hexdigest(Marshal.dump(@discriminators))
+      identifier = [name, discriminator].join(':')
+
+      redis.with do |r|
+        r.exists("#{identifier}.block")
+      end
+    end
+
     private
 
     def run_lua_throttler(redis:, identifier:, bucket_capacity:, leak_rate:, block_for:, n_tokens:)
