@@ -96,12 +96,16 @@ module Prorate
       end
     end
 
-    def throttled?
+    def status
       discriminator = Digest::SHA1.hexdigest(Marshal.dump(@discriminators))
       identifier = [name, discriminator].join(':')
 
       redis.with do |r|
-        r.exists("#{identifier}.block")
+        is_blocked = r.exists("#{identifier}.block")
+        return Status.new(is_throttled: false, remaining_throttle_seconds: 0) unless is_blocked
+
+        remaining_seconds = r.get("#{identifier}.block").to_i - Time.now.to_i
+        Status.new(is_throttled: true, remaining_throttle_seconds: remaining_seconds)
       end
     end
 
@@ -117,6 +121,12 @@ module Prorate
         retry
       else
         raise e
+      end
+    end
+
+    class Status < Ks.strict(:is_throttled, :remaining_throttle_seconds)
+      def throttled?
+        is_throttled
       end
     end
   end

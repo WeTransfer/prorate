@@ -189,48 +189,81 @@ describe Prorate::Throttle do
     end
   end
 
-  describe '#throttled?' do
-    let(:throttle_name) { 'stuffer-%s' % SecureRandom.hex(4) }
+  describe '#status' do
+    let(:throttle_name) { 'throttle-status-%s' % SecureRandom.hex(4) }
     let(:redis) { Redis.new }
+    let(:block_time) { 20 }
     let(:throttle) {
       Prorate::Throttle.new(
         redis: redis,
         logger: Prorate::NullLogger,
         limit: 2,
         period: 2,
-        block_for: 5,
+        block_for: block_time,
         name: throttle_name
       )
     }
+    subject(:status) { throttle.status }
 
-    context 'when never triggered'  do
-      it 'returns false' do
-        expect(throttle.throttled?).to eq false
+    context 'when never triggered' do
+      it 'returns false for #throttled?' do
+        expect(status.throttled?).to eq false
+      end
+
+      it 'returns 0 for #remaining_throttle_seconds' do
+        expect(status.remaining_throttle_seconds).to eq 0
       end
     end
 
     context 'when triggered, but not throttled' do
-      it 'returns false' do
+      before {
         throttle << 'request-id'
         throttle.throttle!
+      }
 
-        expect(throttle.throttled?).to eq false
+      it 'returns false for #throttled?' do
+        expect(status.throttled?).to eq false
+      end
+
+      it 'returns 0 for #remaining_throttle_seconds' do
+        expect(status.remaining_throttle_seconds).to eq 0
       end
     end
 
-    context 'when throttled'  do
-      it 'returns true' do
+    context 'when throttled' do
+      before {
         throttle << 'request-id'
         throttle.throttle!
         throttle.throttle!
         begin
           throttle.throttle!
-        rescue  Prorate::Throttled
+        rescue Prorate::Throttled
           # noop
         end
+      }
 
-        expect(throttle.throttled?).to eq true
+      it 'returns true for #throttled?' do
+        expect(status.throttled?).to eq true
       end
+
+      it 'returns the block time for #remaining_throttle_seconds' do
+        expect(status.remaining_throttle_seconds).to be_within(1).of(block_time)
+      end
+    end
+  end
+
+  describe Prorate::Throttle::Status do
+    it 'has accessors for throttled and remaining time' do
+      status = described_class.new(is_throttled: true, remaining_throttle_seconds: 25)
+
+      %i[is_throttled throttled? remaining_throttle_seconds].each do |method|
+        expect { status.send(method) }.to_not raise_error
+      end
+    end
+
+    it '#throttled? is a convenience method for #is_throttled' do
+      status = described_class.new(is_throttled: 'foo', remaining_throttle_seconds: 'bar')
+      expect(status.is_throttled).to eq(status.throttled?)
     end
   end
 end
