@@ -188,4 +188,49 @@ describe Prorate::Throttle do
       expect(r.get(block_key)).to be_nil
     end
   end
+
+  describe '#throttled?' do
+    let(:throttle_name) { 'stuffer-%s' % SecureRandom.hex(4) }
+    let(:redis) { Redis.new }
+    let(:throttle) {
+      Prorate::Throttle.new(
+        redis: redis,
+        logger: Prorate::NullLogger,
+        limit: 2,
+        period: 2,
+        block_for: 5,
+        name: throttle_name
+      )
+    }
+
+    context 'when never triggered'  do
+      it 'returns false' do
+        expect(throttle.throttled?).to eq false
+      end
+    end
+
+    context 'when triggered, but not throttled' do
+      it 'returns false' do
+        throttle << 'request-id'
+        throttle.throttle!
+
+        expect(throttle.throttled?).to eq false
+      end
+    end
+
+    context 'when throttled'  do
+      it 'returns true' do
+        throttle << 'request-id'
+        throttle.throttle!
+        throttle.throttle!
+        begin
+          throttle.throttle!
+        rescue  Prorate::Throttled
+          # noop
+        end
+
+        expect(throttle.throttled?).to eq true
+      end
+    end
+  end
 end
