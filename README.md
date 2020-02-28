@@ -1,8 +1,10 @@
 # Prorate
 
-Provides a low-level time-based throttle. Is mainly meant for situations where using something like Rack::Attack is not very
-useful since you need access to more variables. Under the hood, this uses a Lua script that implements the
-[Leaky Bucket](https://en.wikipedia.org/wiki/Leaky_bucket) algorithm in a single threaded and race condition safe way.
+Provides a low-level time-based throttle. Is mainly meant for situations where
+using something like Rack::Attack is not very useful since you need access to
+more variables. Under the hood, this uses a Lua script that implements the
+[Leaky Bucket](https://en.wikipedia.org/wiki/Leaky_bucket) algorithm in a single
+threaded and race condition safe way.
 
 [![Build Status](https://travis-ci.org/WeTransfer/prorate.svg?branch=master)](https://travis-ci.org/WeTransfer/prorate)
 [![Gem Version](https://badge.fury.io/rb/prorate.svg)](https://badge.fury.io/rb/prorate)
@@ -17,29 +19,106 @@ gem 'prorate'
 
 And then execute:
 
-    $ bundle
+```shell
+bundle install
+```
 
 Or install it yourself as:
 
-    $ gem install prorate
+```shell
+gem install prorate
+```
 
 ## Usage
 
+The simplest mode of operation is throttling an endpoint, using the throttler
+before the action happens.
+
 Within your Rails controller:
 
-    t = Prorate::Throttle.new(redis: Redis.new, logger: Rails.logger,
-        name: "throttle-login-email", limit: 20, period: 5.seconds)
-    # Add all the parameters that function as a discriminator
-    t << request.ip << params.require(:email)
-    # ...and call the throttle! method
-    t.throttle! # Will raise a Prorate::Throttled exception if the limit has been reached
+```ruby
+t = Prorate::Throttle.new(
+    redis: Redis.new,
+    logger: Rails.logger,
+    name: "throttle-login-email",
+    limit: 20,
+    period: 5.seconds
+)
+# Add all the parameters that function as a discriminator.
+t << request.ip << params.require(:email)
+# ...and call the throttle! method
+t.throttle! # Will raise a Prorate::Throttled exception if the limit has been reached
+#
+# Your regular action happens after this point
+```
 
 To capture that exception, in the controller
 
-    rescue_from Prorate::Throttled do |e|
-      response.set_header('Retry-After', e.retry_in_seconds.to_s)
-      render nothing: true, status: 429
-    end
+```ruby
+rescue_from Prorate::Throttled do |e|
+  response.set_header('Retry-After', e.retry_in_seconds.to_s)
+  render nothing: true, status: 429
+end
+```
+
+### Throttling and checking of its status
+
+More exquisite control can be achieved by combining throttling (see previous
+step) and - in subsequent calls - checking the status of the throttle before
+invoking the throttle.
+
+Let's say you have an endpoint that not only needs throttling, but you want to
+ban [credential stuffers](https://en.wikipedia.org/wiki/Credential_stuffing)
+outright. This is a multi-step process:
+
+1. Respond with a 429 if the discriminators of the request would land in an
+  already blocking 'credential-stuffing'-throttle
+1. Run your regular throttling
+1. Perform your sign in action
+1. If the sign in was unsuccessful, add the discriminators to the
+  'credential-stuffing'-throttle
+
+In your controller that would look like this:
+
+```ruby
+t = Prorate::Throttle.new(
+    redis: Redis.new,
+    logger: Rails.logger,
+    name: "credential-stuffing",
+    limit: 20,
+    period: 20.minutes
+)
+# Add all the parameters that function as a discriminator.
+t << request.ip
+# And before anything else, check whether it is throttled
+if t.status.throttled?
+  response.set_header('Retry-After', t.status.remaining_throttle_seconds.to_s)
+  render(nothing: true, status: 429) and return
+end
+
+# run your regular throttles for the endpoint
+other_throttles.map(:throttle!)
+# Perform your sign in logic..
+
+user = YourSignInLogic.valid?(
+  email: params[:email],
+  password: params[:password]
+)
+
+# Add the request to the credential stuffing throttle if we didn't succeed
+t.throttle! unless user
+
+# the rest of your action
+```
+
+To capture that exception, in the controller
+
+```ruby
+rescue_from Prorate::Throttled do |e|
+  response.set_header('Retry-After', e.retry_in_seconds.to_s)
+  render nothing: true, status: 429
+end
+```
 
 ## Development
 
@@ -51,8 +130,6 @@ To install this gem onto your local machine, run `bundle exec rake install`. To 
 
 Bug reports and pull requests are welcome on GitHub at https://github.com/WeTransfer/prorate.
 
-
 ## License
 
 The gem is available as open source under the terms of the [MIT License](http://opensource.org/licenses/MIT).
-
