@@ -101,7 +101,7 @@ module Prorate
       identifier = [name, discriminator].join(':')
 
       redis.with do |r|
-        is_blocked = r.exists("#{identifier}.block")
+        is_blocked = redis_key_exists?(r, "#{identifier}.block")
         return Status.new(is_throttled: false, remaining_throttle_seconds: 0) unless is_blocked
 
         remaining_seconds = r.get("#{identifier}.block").to_i - Time.now.to_i
@@ -110,6 +110,14 @@ module Prorate
     end
 
     private
+
+    # redis-rb 4.2 started printing a warning for every single-argument use of `#exists`, because
+    # they intend to break compatibility in a future version (to return an integer instead of a
+    # boolean). The old behavior (returning a boolean) is available using the new `exists?` method.
+    def redis_key_exists?(redis, key)
+      return redis.exists?(key) if redis.respond_to?(:exists?)
+      redis.exists(key)
+    end
 
     def run_lua_throttler(redis:, identifier:, bucket_capacity:, leak_rate:, block_for:, n_tokens:)
       redis.evalsha(LUA_SCRIPT_HASH, [], [identifier, bucket_capacity, leak_rate, block_for, n_tokens])
