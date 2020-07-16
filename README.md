@@ -120,6 +120,20 @@ rescue_from Prorate::Throttled do |e|
 end
 ```
 
+## Why Lua?
+
+Prorate is implementing throttling using the "Leaky Bucket" algorithm and is extensively described [here](https://github.com/WeTransfer/prorate/blob/master/lib/prorate/throttle.rb). The implementation is using a Lua script, because is the only language available which runs inside Redis. Thanks to the speed benefits of Redis, the Lua script will also benefits from running fast too.
+
+Using a Lua script in Prorate helps us achieving:
+
+- A guarantee that our script will run atomically.
+
+  The script is evaluated as a single Redis command. This ensures that the commands in the Lua script, will never be interleaved with other commands. They will always execute together.
+
+- Any usages of time will use the Redis time.
+
+  Throttling requires a consistent and monotonic _time source_. The only monotonic and consistent time source which is usable in the context of Prorate, is the `TIME` result of Redis itself. We are throttling requests from different machines, which will invariably have clock drift between them. This way using the Redis server `TIME` helps achieve consistency.
+
 ## Development
 
 After checking out the repo, run `bin/setup` to install dependencies. Then, run `rake spec` to run the tests. You can also run `bin/console` for an interactive prompt that will allow you to experiment.
