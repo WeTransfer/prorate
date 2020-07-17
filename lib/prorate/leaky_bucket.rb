@@ -2,6 +2,19 @@ module Prorate
 
   # This offers just the leaky bucket implementation with fill control, but without the timed lock.
   # It does not raise any exceptions, it just tracks the state of a leaky bucket in Redis.
+  #
+  # Important differences from the more full-featured Throttle class are:
+  #
+  # * No logging (as most meaningful code lives in Lua anyway)
+  # * No timed block - if you need to keep track of timed blocking it can be done externally
+  # * Leak rate is specified directly in tokens per second, instead of specifying the block period.
+  # * The bucket level is stored and returned as a Float which allows for finer-grained measurement,
+  #   but more importantly - makes testing from the outside easier.
+  #
+  # It does have a few downsides compared to the Throttle though
+  #
+  # * Bucket is only full momentarily. On subsequent calls some tokens will leak already, so you either
+  #   need to do delta checks on the value or rely on putting the token into the bucket.
   class LeakyBucket
     LUA_SCRIPT_CODE = File.read(File.join(__dir__, "leaky_bucket.lua"))
     LUA_SCRIPT_HASH = Digest::SHA1.hexdigest(LUA_SCRIPT_CODE)
@@ -40,9 +53,8 @@ module Prorate
       end
     end
 
-    def initialize(redis_key:, leak_rate:, bucket_ttl:, redis:, bucket_capacity:)
+    def initialize(redis_key:, leak_rate:, redis:, bucket_capacity:)
       @redis_key = redis_key
-      @bucket_ttl = bucket_ttl
       @redis = NullPool.new(redis) unless redis.respond_to?(:with)
       @leak_rate = leak_rate.to_f
       @capacity = bucket_capacity.to_f
@@ -89,7 +101,7 @@ module Prorate
           # to be able to smuggle the float across (similar to Redis TIME command)
           level_str, is_full_int = r.evalsha(
             LUA_SCRIPT_HASH,
-            keys: [leaky_bucket_key, last_updated_key], argv: [@leak_rate, @bucket_ttl, n_tokens, @capacity])
+            keys: [leaky_bucket_key, last_updated_key], argv: [@leak_rate, n_tokens, @capacity])
           BucketState.new(level_str.to_f, is_full_int == 1)
         rescue Redis::CommandError => e
           if e.message.include? "NOSCRIPT"

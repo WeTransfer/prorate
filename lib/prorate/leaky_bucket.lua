@@ -11,9 +11,13 @@ local bucket_level_key = KEYS[1]
 local last_updated_key = KEYS[2]
 
 local leak_rate = tonumber(ARGV[1])
-local key_lifetime = tonumber(ARGV[2])
-local fillup = tonumber(ARGV[3]) -- How many tokens this call adds to the bucket.
-local bucket_capacity = tonumber(ARGV[4]) -- How many tokens is the bucket allowed to contain
+local fillup = tonumber(ARGV[2]) -- How many tokens this call adds to the bucket.
+local bucket_capacity = tonumber(ARGV[3]) -- How many tokens is the bucket allowed to contain
+
+-- Compute the key TTL for the bucket. We are interested in how long it takes the bucket
+-- to leak all the way to 0, as this is the time when the values stay relevant. We pad with 1 second
+-- to have a little cushion.
+local key_lifetime = math.ceil((bucket_capacity / leak_rate) + 1)
 
 -- Take a timestamp
 local redis_time = redis.call("TIME") -- Array of [seconds, microseconds]
