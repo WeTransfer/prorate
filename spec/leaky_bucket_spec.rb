@@ -38,7 +38,7 @@ describe Prorate::LeakyBucket do
 
         # We fill to capacity, and even given the precision constraints we should _first_ leak the
         # tokens and then fillup (so we should receive a value which is as close to 2 as feasible)
-        bucket_state = bucket.put(5)
+        bucket_state = bucket.fillup(5)
         expect(bucket_state).to be_full
         expect(bucket_state.level).to be_within(0.005).of(2)
 
@@ -52,7 +52,7 @@ describe Prorate::LeakyBucket do
         expect(bucket_state.level).to be_within(0.01).of(2 - (0.8 * 0.5))
 
         # If we take out tokens ("put" with a negative value) we should ever only end up at 0
-        bucket_state = bucket.put(-20)
+        bucket_state = bucket.fillup(-20)
         expect(bucket_state).not_to be_full
         expect(bucket_state.level).to be_within(0.1).of(0)
 

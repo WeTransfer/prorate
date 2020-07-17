@@ -53,6 +53,21 @@ module Prorate
       end
     end
 
+    # Creates a new LeakyBucket. The object controls 2 keys in Redis: one
+    # for the last access time, and one for the contents of the key.
+    #
+    # @param redis_key_prefix[String] the prefix that is going to be used for keys.
+    #   If your bucket is specific to a user, a browser or an IP address you need to mix in
+    #   those values into the key prefix as appropriate.
+    # @param leak_rate[Float] the leak rate of the bucket, in tokens per second
+    # @param redis[Redis,#with] a Redis connection or a ConnectonPool instance
+    #   if you are using the connection_pool gem. With a connection pool Prorate will
+    #   checkout a connection using `#with` and check it in when it's done.
+    # @param bucket_capacity[Numeric] how many tokens is the bucket capped at.
+    #   Filling up the bucket using `fillup()` will add to that number, but
+    #   the bucket contents will then be capped at this value. So with
+    #   bucket_capacity set to 12 and a `fillup(14)` the bucket will reach the level
+    #   of 12, and will then immediately start leaking again.
     def initialize(redis_key_prefix:, leak_rate:, redis:, bucket_capacity:)
       @redis_key_prefix = redis_key_prefix
       @redis = NullPool.new(redis) unless redis.respond_to?(:with)
@@ -63,7 +78,7 @@ module Prorate
     # Places `n` tokens in the bucket.
     #
     # @return [BucketState] the state of the bucket after the operation
-    def put(n_tokens)
+    def fillup(n_tokens)
       run_lua_bucket_script(n_tokens.to_f)
     end
 
