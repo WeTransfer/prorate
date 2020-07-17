@@ -4,15 +4,27 @@ module Prorate
   class MisconfiguredThrottle < StandardError
   end
 
-  class Throttle < Ks.strict(:name, :limit, :period, :block_for, :redis, :logger)
+  class Throttle
     LUA_SCRIPT_CODE = File.read(File.join(__dir__, "rate_limit.lua"))
     LUA_SCRIPT_HASH = Digest::SHA1.hexdigest(LUA_SCRIPT_CODE)
 
-    def initialize(*)
-      super
+    attr_reader :name, :limit, :period, :block_for, :redis, :logger
+
+    def initialize(name:, limit:, period:, block_for:, redis:, logger: Prorate::NullLogger)
+      @name = name.to_s
       @discriminators = [name.to_s]
-      self.redis = NullPool.new(redis) unless redis.respond_to?(:with)
+      @redis = NullPool.new(redis) unless redis.respond_to?(:with)
+      @logger = logger
+      @block_for = block_for
+
       raise MisconfiguredThrottle if (period <= 0) || (limit <= 0)
+
+      # Do not do type conversions here since we want to allow the caller to read
+      # those values back later
+      # (API contract which the previous implementation of Throttle already supported)
+      @limit = limit
+      @period = period
+
       @leak_rate = limit.to_f / period # tokens per second;
     end
 
@@ -75,41 +87,44 @@ module Prorate
     #   with a arbitrary ratio - like 1 token per inserted row. Once the bucket fills up
     #   the Throttled exception is going to be raised. Defaults to 1.
     def throttle!(n_tokens: 1)
-      discriminator = Digest::SHA1.hexdigest(Marshal.dump(@discriminators))
-      identifier = [name, discriminator].join(':')
+      @logger.debug { "Applying throttle counter %s" % @name }
+      remaining_block_time, bucket_level = run_lua_throttler(
+        identifier: identifier,
+        bucket_capacity: @limit,
+        leak_rate: @leak_rate,
+        block_for: @block_for,
+        n_tokens: n_tokens)
 
-      redis.with do |r|
-        logger.debug { "Applying throttle counter %s" % name }
-        remaining_block_time, bucket_level = run_lua_throttler(
-          redis: r,
-          identifier: identifier,
-          bucket_capacity: limit,
-          leak_rate: @leak_rate,
-          block_for: block_for,
-          n_tokens: n_tokens)
-
-        if remaining_block_time > 0
-          logger.warn { "Throttle %s exceeded limit of %d in %d seconds and is blocked for the next %d seconds" % [name, limit, period, remaining_block_time] }
-          raise ::Prorate::Throttled.new(name, remaining_block_time)
+      if remaining_block_time > 0
+        @logger.warn do
+          "Throttle %s exceeded limit of %d in %d seconds and is blocked for the next %d seconds" % [@name, @limit, @period, remaining_block_time]
         end
-        return limit - bucket_level # How many calls remain
+        raise ::Prorate::Throttled.new(@name, remaining_block_time)
       end
+
+      @limit - bucket_level # Return how many calls remain
     end
 
     def status
-      discriminator = Digest::SHA1.hexdigest(Marshal.dump(@discriminators))
-      identifier = [name, discriminator].join(':')
-
-      redis.with do |r|
-        is_blocked = redis_key_exists?(r, "#{identifier}.block")
-        return Status.new(is_throttled: false, remaining_throttle_seconds: 0) unless is_blocked
-
-        remaining_seconds = r.get("#{identifier}.block").to_i - Time.now.to_i
-        Status.new(is_throttled: true, remaining_throttle_seconds: remaining_seconds)
+      redis_block_key = "#{identifier}.block"
+      @redis.with do |r|
+        is_blocked = redis_key_exists?(r, redis_block_key)
+        if is_blocked
+          remaining_seconds = r.get(redis_block_key).to_i - Time.now.to_i
+          Status.new(_is_throttled = true, remaining_seconds)
+        else
+          remaining_seconds = 0
+          Status.new(_is_throttled = false, remaining_seconds)
+        end
       end
     end
 
     private
+
+    def identifier
+      discriminator = Digest::SHA1.hexdigest(Marshal.dump(@discriminators))
+      "#{@name}:#{discriminator}"
+    end
 
     # redis-rb 4.2 started printing a warning for every single-argument use of `#exists`, because
     # they intend to break compatibility in a future version (to return an integer instead of a
@@ -119,20 +134,24 @@ module Prorate
       redis.exists(key)
     end
 
-    def run_lua_throttler(redis:, identifier:, bucket_capacity:, leak_rate:, block_for:, n_tokens:)
-      redis.evalsha(LUA_SCRIPT_HASH, [], [identifier, bucket_capacity, leak_rate, block_for, n_tokens])
-    rescue Redis::CommandError => e
-      if e.message.include? "NOSCRIPT"
-        # The Redis server has never seen this script before. Needs to run only once in the entire lifetime
-        # of the Redis server, until the script changes - in which case it will be loaded under a different SHA
-        redis.script(:load, LUA_SCRIPT_CODE)
-        retry
-      else
-        raise e
+    def run_lua_throttler(identifier:, bucket_capacity:, leak_rate:, block_for:, n_tokens:)
+      @redis.with do |redis|
+        begin
+          redis.evalsha(LUA_SCRIPT_HASH, [], [identifier, bucket_capacity, leak_rate, block_for, n_tokens])
+        rescue Redis::CommandError => e
+          if e.message.include? "NOSCRIPT"
+            # The Redis server has never seen this script before. Needs to run only once in the entire lifetime
+            # of the Redis server, until the script changes - in which case it will be loaded under a different SHA
+            redis.script(:load, LUA_SCRIPT_CODE)
+            retry
+          else
+            raise e
+          end
+        end
       end
     end
 
-    class Status < Ks.strict(:is_throttled, :remaining_throttle_seconds)
+    class Status < Struct.new(:is_throttled, :remaining_throttle_seconds)
       def throttled?
         is_throttled
       end

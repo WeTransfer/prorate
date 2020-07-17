@@ -1,6 +1,4 @@
 require "prorate/version"
-require "ks"
-require "logger"
 require "redis"
 
 module Prorate
