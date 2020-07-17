@@ -7,12 +7,30 @@ module Prorate
     LUA_SCRIPT_HASH = Digest::SHA1.hexdigest(LUA_SCRIPT_CODE)
 
     class BucketState < Struct.new(:level, :full)
+      # Returns the level of the bucket after the operation on the LeakyBucket
+      # object has taken place. There is a guarantee that no tokens have leaked
+      # from the bucket between the operation and the freezing of the BucketState
+      # struct.
+      #
+      # @!attribute [r] level
+      #   @return [Float]
+
+      # Tells whether the bucket was detected to be full when the operation on
+      # the LeakyBucket was performed. There is a guarantee that no tokens have leaked
+      # from the bucket between the operation and the freezing of the BucketState
+      # struct.
+      #
+      # @!attribute [r] full
+      #   @return [Boolean]
+
       alias_method :full?, :full
 
+      # Returns the bucket level of the bucket state as a Float
       def to_f
         level.to_f
       end
 
+      # Returns the bucket level of the bucket state rounded to an Integer
       def to_i
         level.to_i
       end
