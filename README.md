@@ -61,11 +61,11 @@ rescue_from Prorate::Throttled do |e|
 end
 ```
 
-### Throttling and checking of its status
+### Throttling and checking status
 
 More exquisite control can be achieved by combining throttling (see previous
 step) and - in subsequent calls - checking the status of the throttle before
-invoking the throttle.
+invoking the throttle. **When you call `throttle!`, you add tokens to the leaky bucket.**
 
 Let's say you have an endpoint that not only needs throttling, but you want to
 ban [credential stuffers](https://en.wikipedia.org/wiki/Credential_stuffing)
@@ -118,6 +118,28 @@ rescue_from Prorate::Throttled do |e|
   response.set_header('Retry-After', e.retry_in_seconds.to_s)
   render nothing: true, status: 429
 end
+```
+
+## Using just the leaky bucket
+
+There is also an object for using the heart of Prorate (the leaky bucket) without blocking or exceptions. This is useful
+if you want to implement a more generic rate limiting solution and customise it in a fancier way. The leaky bucket on
+it's own provides the following conveniences only:
+
+* Track the number of tokens added and the number of tokens that have leaked
+* Tracks whether a specific token fillup has overflown the bucket. This is only tracked momentarily if the bucket is limited
+
+Level and leak rate are computed and provided as Floats instead of Integers (in the Throttle class).
+To use it, employ the `LeakyBucket` object:
+
+```ruby
+# The leak_rate is in tokens per second
+leaky_bucket = Prorate::LeakyBucket.new(redis: Redis.new, redis_key_prefix: "user123", leak_rate: 0.8, bucket_capacity: 2)
+leaky_bucket.state.level #=> will return 0.0
+leaky_bucket.state.full? #=> will return "false"
+state_after_add = leaky_bucket.put(2) #=> returns a State object_
+state_after_add.full? #=> will return "true"
+state_after_add.level? #=> will return 2.0
 ```
 
 ## Why Lua?
