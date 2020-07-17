@@ -9,6 +9,10 @@ YARD::Rake::YardocTask.new(:doc) do |t|
   t.files = ['lib/**/*.rb', '-', 'LICENSE.txt', 'CHANGELOG.md']
 end
 
-RSpec::Core::RakeTask.new(:spec)
+RSpec::Core::RakeTask.new(:spec) do |spec|
+  spec.rspec_opts = ["-c", "--order=rand"]
+  spec.pattern = FileList['spec/**/*_spec.rb']
+end
+
 RuboCop::RakeTask.new(:rubocop)
 task default: [:spec, :rubocop]
