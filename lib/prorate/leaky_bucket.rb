@@ -26,11 +26,15 @@ module Prorate
       alias_method :full?, :full
 
       # Returns the bucket level of the bucket state as a Float
+      #
+      # @return [Float]
       def to_f
         level.to_f
       end
 
       # Returns the bucket level of the bucket state rounded to an Integer
+      #
+      # @return [Integer]
       def to_i
         level.to_i
       end
