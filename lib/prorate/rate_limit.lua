@@ -15,8 +15,10 @@ local max_bucket_capacity = tonumber(ARGV[2])
 local leak_rate = tonumber(ARGV[3])
 local block_duration = tonumber(ARGV[4])
 local n_tokens = tonumber(ARGV[5]) -- How many tokens this call adds to the bucket. Defaults to 1
-local now = tonumber(redis.call("TIME")[1]) --unix timestamp, will be required in all paths
 
+-- Take the Redis timestamp
+local redis_time = redis.call("TIME") -- Array of [seconds, microseconds]
+local now = tonumber(redis_time[1]) + (tonumber(redis_time[2]) / 1000000)
 local key_lifetime = math.ceil(max_bucket_capacity / leak_rate)
 
 local blocked_until = redis.call("GET", block_key)
