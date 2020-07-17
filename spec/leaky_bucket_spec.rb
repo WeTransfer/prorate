@@ -15,8 +15,8 @@ describe Prorate::LeakyBucket do
 
     # Since we haven't put in any tokens, asking for the levels should not have created
     # any Redis keys as we do not need them
-    expect(r).not_to be_exists(bucket.leaky_bucket_key)
-    expect(r).not_to be_exists(bucket.last_updated_key)
+    expect(r.get(bucket.leaky_bucket_key)).to be_nil
+    expect(r.get(bucket.last_updated_key)).to be_nil
 
     sleep(0.2) # Bucket should stay empty and not go into negative
     expect(bucket.state.to_f).to be >= 0
