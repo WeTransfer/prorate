@@ -53,8 +53,8 @@ module Prorate
       end
     end
 
-    def initialize(redis_key:, leak_rate:, redis:, bucket_capacity:)
-      @redis_key = redis_key
+    def initialize(redis_key_prefix:, leak_rate:, redis:, bucket_capacity:)
+      @redis_key_prefix = redis_key_prefix
       @redis = NullPool.new(redis) unless redis.respond_to?(:with)
       @leak_rate = leak_rate.to_f
       @capacity = bucket_capacity.to_f
@@ -80,7 +80,7 @@ module Prorate
     #
     # @return [String]
     def leaky_bucket_key
-      "#{@redis_key}.leaky_bucket.bucket_level"
+      "#{@redis_key_prefix}.leaky_bucket.bucket_level"
     end
 
     # Returns the Redis key under which the last updated time of the bucket gets stored.
@@ -89,7 +89,7 @@ module Prorate
     #
     # @return [String]
     def last_updated_key
-      "#{@redis_key}.leaky_bucket.last_updated"
+      "#{@redis_key_prefix}.leaky_bucket.last_updated"
     end
 
     private
