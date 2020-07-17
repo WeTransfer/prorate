@@ -18,7 +18,7 @@ describe Prorate::LeakyBucket do
 
     25.times do |n|
       it "on iteration #{n} accepts the number of tokens and returns the new bucket level" do
-        bucket_name = generate_random_bucket_name.()
+        bucket_name = generate_random_bucket_name.call
         r = Redis.new
         bucket = described_class.new(redis: r, redis_key_prefix: bucket_name, leak_rate: 0.8, bucket_capacity: 2)
 
