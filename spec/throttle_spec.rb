@@ -24,7 +24,7 @@ describe Prorate::Throttle do
 
     it 'throttles and raises an exception' do
       r = Redis.new
-      t = Prorate::Throttle.new(redis: r, logger: Prorate::NullLogger, limit: 2, period: 2, block_for: 5, name: throttle_name)
+      t = Prorate::Throttle.new(redis: r, limit: 2, period: 2, block_for: 5, name: throttle_name)
       t << 'request-id'
       t << 'user-id'
 
@@ -37,7 +37,7 @@ describe Prorate::Throttle do
 
     it 'with n_tokens of 0 simply keeps track of the throttle but does not trigger it' do
       r = Redis.new
-      t = Prorate::Throttle.new(redis: r, logger: Prorate::NullLogger, limit: 2, period: 2, block_for: 5, name: throttle_name)
+      t = Prorate::Throttle.new(redis: r, limit: 2, period: 2, block_for: 5, name: throttle_name)
       t << 'request-id'
       t << 'user-id'
 
@@ -48,7 +48,7 @@ describe Prorate::Throttle do
 
     it 'with n_tokens of 20 immediately triggers, already on the first call' do
       r = Redis.new
-      t = Prorate::Throttle.new(redis: r, logger: Prorate::NullLogger, limit: 2, period: 2, block_for: 5, name: throttle_name)
+      t = Prorate::Throttle.new(redis: r, limit: 2, period: 2, block_for: 5, name: throttle_name)
       t << 'request-id'
       t << 'user-id'
 
@@ -59,7 +59,7 @@ describe Prorate::Throttle do
 
     it 'with a negative n_tokens keeps remaining calls at limit: value even if it would go above' do
       r = Redis.new
-      t = Prorate::Throttle.new(redis: r, logger: Prorate::NullLogger, limit: 8, period: 2, block_for: 5, name: throttle_name)
+      t = Prorate::Throttle.new(redis: r, limit: 8, period: 2, block_for: 5, name: throttle_name)
       t << 'some-id'
 
       expect(t.throttle!(n_tokens: 0)).to eq(8)
@@ -69,7 +69,7 @@ describe Prorate::Throttle do
 
     it 'with a negative n_tokens allows "dripping" one token out' do
       r = Redis.new
-      t = Prorate::Throttle.new(redis: r, logger: Prorate::NullLogger, limit: 8, period: 2, block_for: 5, name: throttle_name)
+      t = Prorate::Throttle.new(redis: r, limit: 8, period: 2, block_for: 5, name: throttle_name)
       t << 'some-id'
 
       expect(t.throttle!(n_tokens: 0)).to eq(8)
@@ -80,7 +80,7 @@ describe Prorate::Throttle do
     it 'uses the given parameters to differentiate between users' do
       r = Redis.new
       4.times { |i|
-        t = Prorate::Throttle.new(redis: r, logger: Prorate::NullLogger, limit: 3, period: 2, block_for: 2, name: throttle_name)
+        t = Prorate::Throttle.new(redis: r, limit: 3, period: 2, block_for: 2, name: throttle_name)
         t << i
         3.times { t.throttle! }
       }
@@ -89,7 +89,7 @@ describe Prorate::Throttle do
     it 'applies a long block, even if the rolling window for the throttle is shorter' do
       r = Redis.new
       # Exhaust the request limit
-      t = Prorate::Throttle.new(redis: r, logger: Prorate::NullLogger, limit: 4, period: 1, block_for: 60, name: throttle_name)
+      t = Prorate::Throttle.new(redis: r, limit: 4, period: 1, block_for: 60, name: throttle_name)
       4.times do
         t.throttle!
       end
@@ -109,19 +109,19 @@ describe Prorate::Throttle do
       r = Redis.new
       # Exhaust the request limit
       4.times do
-        t = Prorate::Throttle.new(redis: r, logger: Prorate::NullLogger, limit: 4, period: 1, block_for: 2, name: throttle_name)
+        t = Prorate::Throttle.new(redis: r, limit: 4, period: 1, block_for: 2, name: throttle_name)
         t.throttle!
       end
       # bucket is now full; next request will overflow it
       expect {
-        t = Prorate::Throttle.new(redis: r, logger: Prorate::NullLogger, limit: 4, period: 1, block_for: 1, name: throttle_name)
+        t = Prorate::Throttle.new(redis: r, limit: 4, period: 1, block_for: 1, name: throttle_name)
         t.throttle!
       }.to raise_error(Prorate::Throttled)
 
       sleep 1.5
 
       # This one should pass again
-      t = Prorate::Throttle.new(redis: r, logger: Prorate::NullLogger, limit: 4, period: 1, block_for: 1, name: throttle_name)
+      t = Prorate::Throttle.new(redis: r, limit: 4, period: 1, block_for: 1, name: throttle_name)
       t.throttle!
     end
 
@@ -143,7 +143,7 @@ describe Prorate::Throttle do
     it 'loads the lua script into Redis if necessary' do
       r = Redis.new
       r.script(:flush)
-      t = Prorate::Throttle.new(redis: r, logger: Prorate::NullLogger, limit: 30, period: 10, block_for: 2, name: throttle_name)
+      t = Prorate::Throttle.new(redis: r, limit: 30, period: 10, block_for: 2, name: throttle_name)
       expect(r).to receive(:evalsha).exactly(2).times.and_call_original
       expect {
         t.throttle!
@@ -152,7 +152,7 @@ describe Prorate::Throttle do
 
     it 'does not keep keys around for longer than necessary' do
       r = Redis.new
-      t = Prorate::Throttle.new(redis: r, logger: Prorate::NullLogger, limit: 2, period: 2, block_for: 3, name: throttle_name)
+      t = Prorate::Throttle.new(redis: r, limit: 2, period: 2, block_for: 3, name: throttle_name)
 
       discriminator_string = Digest::SHA1.hexdigest(Marshal.dump([throttle_name]))
       bucket_key = throttle_name + ':' + discriminator_string + '.bucket_level'
@@ -200,7 +200,6 @@ describe Prorate::Throttle do
     let(:throttle) {
       Prorate::Throttle.new(
         redis: redis,
-        logger: Prorate::NullLogger,
         limit: 2,
         period: 2,
         block_for: block_time,
