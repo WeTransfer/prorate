@@ -5,8 +5,11 @@
 -- this is required to be able to use TIME and writes; basically it lifts the script into IO
 redis.replicate_commands()
 
--- Keys are passed separately as Redis ensures that the keys live on the
--- same shard (or at least verifies for it). You have to pass all the keys you intend to touch.
+-- Redis documentation recommends passing the keys separately so that Redis
+-- can - in the future - verify that they live on the same shard of a cluster, and
+-- raise an error if they are not. As far as can be understood this functionality is not
+-- yet present, but if we can make a little effort to make ourselves more future proof
+-- we should.
 local bucket_level_key = KEYS[1]
 local last_updated_key = KEYS[2]
 
