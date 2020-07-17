@@ -10,6 +10,7 @@
   limit ourselves to "anchored slots" on the start of a second, and we would be effectively doing that
   with our previous setup.
 * Fix the `redis` gem deprecation warnings when using `exists` - we will now use `exists?` if available.
+* Remove dependency on the `ks` gem as we can use vanilla Structs or classes instead.
 
 # 0.6.0
 
