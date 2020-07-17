@@ -139,7 +139,7 @@ leaky_bucket.state.level #=> will return 0.0
 leaky_bucket.state.full? #=> will return "false"
 state_after_add = leaky_bucket.put(2) #=> returns a State object_
 state_after_add.full? #=> will return "true"
-state_after_add.level? #=> will return 2.0
+state_after_add.level #=> will return 2.0
 ```
 
 ## Why Lua?
