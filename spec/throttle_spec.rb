@@ -193,6 +193,21 @@ describe Prorate::Throttle do
     end
   end
 
+  it 'provides attribute readers for the Throttle constructor keyword arguments' do
+    # This is how the API works currently. We should actually remove this functionality,
+    # because it is not evident it adds a lot of value - but if we remove those readers
+    # in a minor version bump we might break consumers.
+    logger_double = double('Logger')
+    t = Prorate::Throttle.new(redis: double('Redis'), logger: logger_double, limit: 8, period: 4, block_for: 3, name: "hello")
+
+    expect(t.redis).to respond_to(:with) # Gets wrapped in a NullPool
+    expect(t.logger).to eq(logger_double)
+    expect(t.limit).to eq(8)
+    expect(t.period).to eq(4)
+    expect(t.block_for).to eq(3)
+    expect(t.name).to eq("hello")
+  end
+
   describe '#status' do
     let(:throttle_name) { 'throttle-status-%s' % SecureRandom.hex(4) }
     let(:redis) { Redis.new }

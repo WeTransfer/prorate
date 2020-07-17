@@ -8,6 +8,8 @@ module Prorate
     LUA_SCRIPT_CODE = File.read(File.join(__dir__, "rate_limit.lua"))
     LUA_SCRIPT_HASH = Digest::SHA1.hexdigest(LUA_SCRIPT_CODE)
 
+    attr_reader :name, :limit, :period, :block_for, :redis, :logger
+
     def initialize(name:, limit:, period:, block_for:, redis:, logger: Prorate::NullLogger)
       @name = name.to_s
       @discriminators = [name.to_s]
@@ -17,8 +19,12 @@ module Prorate
 
       raise MisconfiguredThrottle if (period <= 0) || (limit <= 0)
 
-      @limit = limit.to_f
-      @period = period.to_f
+      # Do not do type conversions here since we want to allow the caller to read
+      # those values back later
+      # (API contract which the previous implementation of Throttle already supported)
+      @limit = limit
+      @period = period
+
       @leak_rate = limit.to_f / period # tokens per second;
     end
 
