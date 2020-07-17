@@ -126,6 +126,10 @@ describe Prorate::Throttle do
     end
 
     it 'logs all the things' do
+      # Only require it now so that if we happen to attempt to instantiate a logger elsewhere
+      # we have the potential of having the test fail. Prorate should not require logger.rb by itself
+      require 'logger'
+
       buf = StringIO.new
       logger = Logger.new(buf)
       logger.level = 0
