@@ -137,24 +137,19 @@ To use it, employ the `LeakyBucket` object:
 leaky_bucket = Prorate::LeakyBucket.new(redis: Redis.new, redis_key_prefix: "user123", leak_rate: 0.8, bucket_capacity: 2)
 leaky_bucket.state.level #=> will return 0.0
 leaky_bucket.state.full? #=> will return "false"
-state_after_add = leaky_bucket.put(2) #=> returns a State object_
+state_after_add = leaky_bucket.fillup(2) #=> returns a State object_
 state_after_add.full? #=> will return "true"
 state_after_add.level #=> will return 2.0
 ```
 
 ## Why Lua?
 
-Prorate is implementing throttling using the "Leaky Bucket" algorithm and is extensively described [here](https://github.com/WeTransfer/prorate/blob/master/lib/prorate/throttle.rb). The implementation is using a Lua script, because is the only language available which runs inside Redis. Thanks to the speed benefits of Redis, the Lua script will also benefits from running fast too.
+Prorate is implementing throttling using the "Leaky Bucket" algorithm and is extensively described [here](https://github.com/WeTransfer/prorate/blob/master/lib/prorate/throttle.rb). The implementation is using a Lua script, because is the only language available which runs _inside_ Redis. Thanks to the speed benefits of Lua the script runs fast enough to apply it on every throttle call.
 
-Using a Lua script in Prorate helps us achieving:
+Using a Lua script in Prorate helps us achieve the following guarantees:
 
-- A guarantee that our script will run atomically.
-
-  The script is evaluated as a single Redis command. This ensures that the commands in the Lua script, will never be interleaved with other commands. They will always execute together.
-
-- Any usages of time will use the Redis time.
-
-  Throttling requires a consistent and monotonic _time source_. The only monotonic and consistent time source which is usable in the context of Prorate, is the `TIME` result of Redis itself. We are throttling requests from different machines, which will invariably have clock drift between them. This way using the Redis server `TIME` helps achieve consistency.
+- **The script will run atomically.** The script is evaluated as a single Redis command. This ensures that the commands in the Lua script will never be interleaved with another client: they will always execute together.
+- **Any usages of time will use the Redis time.** Throttling requires a consistent and monotonic _time source_. The only monotonic and consistent time source which is usable in the context of Prorate, is the `TIME` result of Redis itself. We are throttling requests from different machines, which will invariably have clock drift between them. This way using the Redis server `TIME` helps achieve consistency.
 
 ## Development
 
