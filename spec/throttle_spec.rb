@@ -24,19 +24,23 @@ describe Prorate::Throttle do
     let(:throttle_name) { 'leecher-%s' % SecureRandom.hex(4) }
     let(:r) { Redis.new }
 
-    context 'with a connection pool' do
-      it 'throttles and raises an exception' do
-        pool = ConnectionPool.new { r }
-        t = Prorate::Throttle.new(redis: pool, limit: 2, period: 2, block_for: 5, name: throttle_name)
-        t << 'request-id'
-        t << 'user-id'
+    it 'is able to use a ConnectionPool' do
+      pool = ConnectionPool.new { r }
+      t = Prorate::Throttle.new(redis: pool, limit: 2, period: 2, block_for: 5, name: throttle_name)
+      t << 'request-id' << 'user-id'
 
+      expect {
         t.throttle!
+      }.not_to raise_error
+    end
+
+    it 'is able to use a naked Redis connection' do
+      t = Prorate::Throttle.new(redis: r, limit: 2, period: 2, block_for: 5, name: throttle_name)
+      t << 'request-id' << 'user-id'
+
+      expect {
         t.throttle!
-        expect {
-          t.throttle!
-        }.to raise_error(Prorate::Throttled)
-      end
+      }.not_to raise_error
     end
 
     it 'throttles and raises an exception' do
