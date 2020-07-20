@@ -18,10 +18,11 @@ describe Prorate::LeakyBucket do
     }
 
     let(:bucket_name) { generate_random_bucket_name.call }
+    let(:r) { Redis.new }
 
     context 'with a connection pool' do
       it 'initializes the bucket with no keys' do
-        pool = ConnectionPool.new(size: 3, timeout: 3) { Redis.new }
+        pool = ConnectionPool.new { r }
         bucket = described_class.new(redis: pool, redis_key_prefix: bucket_name, leak_rate: 0.8, bucket_capacity: 2)
 
         # Nothing should be written into Redis just when creating the object in Ruby
@@ -34,7 +35,6 @@ describe Prorate::LeakyBucket do
 
     25.times do |n|
       it "on iteration #{n} accepts the number of tokens and returns the new bucket level" do
-        r = Redis.new
         bucket = described_class.new(redis: r, redis_key_prefix: bucket_name, leak_rate: 0.8, bucket_capacity: 2)
 
         # Nothing should be written into Redis just when creating the object in Ruby

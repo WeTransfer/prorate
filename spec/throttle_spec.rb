@@ -26,7 +26,7 @@ describe Prorate::Throttle do
 
     context 'with a connection pool' do
       it 'throttles and raises an exception' do
-        pool = ConnectionPool.new(size: 3, timeout: 3) { Redis.new }
+        pool = ConnectionPool.new { r }
         t = Prorate::Throttle.new(redis: pool, limit: 2, period: 2, block_for: 5, name: throttle_name)
         t << 'request-id'
         t << 'user-id'
