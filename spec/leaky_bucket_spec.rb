@@ -1,5 +1,6 @@
 require 'spec_helper'
 require 'securerandom'
+require 'connection_pool'
 
 describe Prorate::LeakyBucket do
   describe 'in a happy path' do
@@ -16,52 +17,68 @@ describe Prorate::LeakyBucket do
       end.pack("C*")
     }
 
-    25.times do |n|
-      it "on iteration #{n} accepts the number of tokens and returns the new bucket level" do
-        bucket_name = generate_random_bucket_name.call
-        r = Redis.new
-        bucket = described_class.new(redis: r, redis_key_prefix: bucket_name, leak_rate: 0.8, bucket_capacity: 2)
+    let(:bucket_name) { generate_random_bucket_name.call }
+
+    context 'with a connection pool' do
+      it 'initializes the bucket with no keys' do
+        pool = ConnectionPool.new(size: 3, timeout: 3) { Redis.new }
+        bucket = described_class.new(redis: pool, redis_key_prefix: bucket_name, leak_rate: 0.8, bucket_capacity: 2)
 
         # Nothing should be written into Redis just when creating the object in Ruby
-        expect(r.get(bucket.leaky_bucket_key)).to be_nil
-        expect(r.get(bucket.last_updated_key)).to be_nil
+        pool.with do |r|
+          expect(r.get(bucket.leaky_bucket_key)).to be_nil
+          expect(r.get(bucket.last_updated_key)).to be_nil
+        end
+      end
+    end
 
-        expect(bucket.state.to_f).to be_within(0.00001).of(0)
+    context 'with a single redis' do
+      25.times do |n|
+        it "on iteration #{n} accepts the number of tokens and returns the new bucket level" do
+          r = Redis.new
+          bucket = described_class.new(redis: r, redis_key_prefix: bucket_name, leak_rate: 0.8, bucket_capacity: 2)
 
-        # Since we haven't put in any tokens, asking for the levels should not have created
-        # any Redis keys as we do not need them
-        expect(r.get(bucket.leaky_bucket_key)).to be_nil
-        expect(r.get(bucket.last_updated_key)).to be_nil
+          # Nothing should be written into Redis just when creating the object in Ruby
+          expect(r.get(bucket.leaky_bucket_key)).to be_nil
+          expect(r.get(bucket.last_updated_key)).to be_nil
 
-        sleep(0.2) # Bucket should stay empty and not go into negative
-        expect(bucket.state.to_f).to be >= 0
+          expect(bucket.state.to_f).to be_within(0.00001).of(0)
 
-        # We fill to capacity, and even given the precision constraints we should _first_ leak the
-        # tokens and then fillup (so we should receive a value which is as close to 2 as feasible)
-        bucket_state = bucket.fillup(5)
-        expect(bucket_state).to be_full
-        expect(bucket_state.level).to be_within(0.005).of(2)
+          # Since we haven't put in any tokens, asking for the levels should not have created
+          # any Redis keys as we do not need them
+          expect(r.get(bucket.leaky_bucket_key)).to be_nil
+          expect(r.get(bucket.last_updated_key)).to be_nil
 
-        # Since we did put in tokens now the keys should have been created
-        expect(r.get(bucket.leaky_bucket_key)).not_to be_nil
-        expect(r.get(bucket.last_updated_key)).not_to be_nil
+          sleep(0.2) # Bucket should stay empty and not go into negative
+          expect(bucket.state.to_f).to be >= 0
 
-        sleep(0.5)
-        bucket_state = bucket.state
-        expect(bucket_state).not_to be_full
-        expect(bucket_state.level).to be_within(0.01).of(2 - (0.8 * 0.5))
+          # We fill to capacity, and even given the precision constraints we should _first_ leak the
+          # tokens and then fillup (so we should receive a value which is as close to 2 as feasible)
+          bucket_state = bucket.fillup(5)
+          expect(bucket_state).to be_full
+          expect(bucket_state.level).to be_within(0.005).of(2)
 
-        # If we take out tokens ("put" with a negative value) we should ever only end up at 0
-        bucket_state = bucket.fillup(-20)
-        expect(bucket_state).not_to be_full
-        expect(bucket_state.level).to be_within(0.1).of(0)
+          # Since we did put in tokens now the keys should have been created
+          expect(r.get(bucket.leaky_bucket_key)).not_to be_nil
+          expect(r.get(bucket.last_updated_key)).not_to be_nil
 
-        # We need to make sure the keys which we set have a TTL and that the TTL
-        # is reasonable. We cannot check whether the key has been expired or not because deletion in
-        # Redis is somewhat best-effort - there is no guarantee that something will be deleted at
-        # the given TTL, so testing for it is not very useful
-        expect(r.ttl(bucket.leaky_bucket_key)).to be_within(0.5).of(4)
-        expect(r.ttl(bucket.last_updated_key)).to be_within(0.5).of(4)
+          sleep(0.5)
+          bucket_state = bucket.state
+          expect(bucket_state).not_to be_full
+          expect(bucket_state.level).to be_within(0.01).of(2 - (0.8 * 0.5))
+
+          # If we take out tokens ("put" with a negative value) we should ever only end up at 0
+          bucket_state = bucket.fillup(-20)
+          expect(bucket_state).not_to be_full
+          expect(bucket_state.level).to be_within(0.1).of(0)
+
+          # We need to make sure the keys which we set have a TTL and that the TTL
+          # is reasonable. We cannot check whether the key has been expired or not because deletion in
+          # Redis is somewhat best-effort - there is no guarantee that something will be deleted at
+          # the given TTL, so testing for it is not very useful
+          expect(r.ttl(bucket.leaky_bucket_key)).to be_within(0.5).of(4)
+          expect(r.ttl(bucket.last_updated_key)).to be_within(0.5).of(4)
+        end
       end
     end
   end
