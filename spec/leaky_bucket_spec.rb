@@ -20,17 +20,15 @@ describe Prorate::LeakyBucket do
     let(:bucket_name) { generate_random_bucket_name.call }
     let(:r) { Redis.new }
 
-    context 'with a connection pool' do
-      it 'initializes the bucket with no keys' do
-        pool = ConnectionPool.new { r }
-        bucket = described_class.new(redis: pool, redis_key_prefix: bucket_name, leak_rate: 0.8, bucket_capacity: 2)
+    it 'is able to use a ConnectionPool' do
+      pool = ConnectionPool.new { r }
+      bucket = described_class.new(redis: pool, redis_key_prefix: bucket_name, leak_rate: 0.8, bucket_capacity: 2)
+      expect(bucket.state.level).to be_within(0.01).of(0)
+    end
 
-        # Nothing should be written into Redis just when creating the object in Ruby
-        pool.with do |redis|
-          expect(redis.get(bucket.leaky_bucket_key)).to be_nil
-          expect(redis.get(bucket.last_updated_key)).to be_nil
-        end
-      end
+    it 'is able to use a naked Redis connection' do
+      bucket = described_class.new(redis: r, redis_key_prefix: bucket_name, leak_rate: 0.8, bucket_capacity: 2)
+      expect(bucket.state.level).to be_within(0.01).of(0)
     end
 
     25.times do |n|
@@ -64,7 +62,7 @@ describe Prorate::LeakyBucket do
         sleep(0.5)
         bucket_state = bucket.state
         expect(bucket_state).not_to be_full
-        expect(bucket_state.level).to be_within(0.01).of(2 - (0.8 * 0.5))
+        expect(bucket_state.level).to be_within(0.1).of(2 - (0.8 * 0.5))
 
         # If we take out tokens ("put" with a negative value) we should ever only end up at 0
         bucket_state = bucket.fillup(-20)
