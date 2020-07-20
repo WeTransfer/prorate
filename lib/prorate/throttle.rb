@@ -13,7 +13,7 @@ module Prorate
     def initialize(name:, limit:, period:, block_for:, redis:, logger: Prorate::NullLogger)
       @name = name.to_s
       @discriminators = [name.to_s]
-      @redis = NullPool.new(redis) unless redis.respond_to?(:with)
+      @redis = redis.respond_to?(:with) ? redis : NullPool.new(redis)
       @logger = logger
       @block_for = block_for
 
