@@ -60,7 +60,7 @@ module Prorate
     #   If your bucket is specific to a user, a browser or an IP address you need to mix in
     #   those values into the key prefix as appropriate.
     # @param leak_rate[Float] the leak rate of the bucket, in tokens per second
-    # @param redis[Redis,#with] a Redis connection or a ConnectonPool instance
+    # @param redis[Redis,#with] a Redis connection or a ConnectionPool instance
     #   if you are using the connection_pool gem. With a connection pool Prorate will
     #   checkout a connection using `#with` and check it in when it's done.
     # @param bucket_capacity[Numeric] how many tokens is the bucket capped at.
