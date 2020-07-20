@@ -1,3 +1,9 @@
+# 0.7.1
+
+* Fix use of a ConnectionPool as `redis:` argument which was broken in 0.7.0
+* Use the Lua KEYS argument in `rate_limit.lua` for future-proof clustering support
+  instead of computing the touched keys inside the Lua script.
+
 # 0.7.0
 
 * Add a naked `LeakyBucket` object which allows one to build sophisticated rate limiting relying
