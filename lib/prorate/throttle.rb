@@ -135,9 +135,15 @@ module Prorate
     end
 
     def run_lua_throttler(identifier:, bucket_capacity:, leak_rate:, block_for:, n_tokens:)
+      # Computing the identifier is somewhat involved so we should avoid doing it too often
+      id = identifier
+      bucket_level_key = "#{id}.bucket_level"
+      last_updated_key = "#{id}.last_updated"
+      block_key = "#{id}.block"
+
       @redis.with do |redis|
         begin
-          redis.evalsha(LUA_SCRIPT_HASH, [], [identifier, bucket_capacity, leak_rate, block_for, n_tokens])
+          redis.evalsha(LUA_SCRIPT_HASH, keys: [bucket_level_key, last_updated_key, block_key], argv: [bucket_capacity, leak_rate, block_for, n_tokens])
         rescue Redis::CommandError => e
           if e.message.include? "NOSCRIPT"
             # The Redis server has never seen this script before. Needs to run only once in the entire lifetime

@@ -8,13 +8,21 @@
 redis.replicate_commands()
 -- make some nicer looking variable names:
 local retval = nil
-local bucket_level_key = ARGV[1] .. ".bucket_level"
-local last_updated_key = ARGV[1] .. ".last_updated"
-local block_key = ARGV[1] .. ".block"
-local max_bucket_capacity = tonumber(ARGV[2])
-local leak_rate = tonumber(ARGV[3])
-local block_duration = tonumber(ARGV[4])
-local n_tokens = tonumber(ARGV[5]) -- How many tokens this call adds to the bucket. Defaults to 1
+
+-- Redis documentation recommends passing the keys separately so that Redis
+-- can - in the future - verify that they live on the same shard of a cluster, and
+-- raise an error if they are not. As far as can be understood this functionality is not
+-- yet present, but if we can make a little effort to make ourselves more future proof
+-- we should.
+local bucket_level_key = KEYS[1]
+local last_updated_key = KEYS[2]
+local block_key = KEYS[3]
+
+-- and the config variables
+local max_bucket_capacity = tonumber(ARGV[1])
+local leak_rate = tonumber(ARGV[2])
+local block_duration = tonumber(ARGV[3])
+local n_tokens = tonumber(ARGV[4]) -- How many tokens this call adds to the bucket. Defaults to 1
 
 -- Take the Redis timestamp
 local redis_time = redis.call("TIME") -- Array of [seconds, microseconds]
