@@ -22,6 +22,7 @@ describe Prorate::Throttle do
 
   describe '#throttle!' do
     let(:throttle_name) { 'leecher-%s' % SecureRandom.hex(4) }
+    let(:r) { Redis.new }
 
     context 'with a connection pool' do
       it 'throttles and raises an exception' do
@@ -38,167 +39,163 @@ describe Prorate::Throttle do
       end
     end
 
-    context 'with a single redis' do
-      let(:r) { Redis.new }
+    it 'throttles and raises an exception' do
+      t = Prorate::Throttle.new(redis: r, limit: 2, period: 2, block_for: 5, name: throttle_name)
+      t << 'request-id'
+      t << 'user-id'
 
-      it 'throttles and raises an exception' do
-        t = Prorate::Throttle.new(redis: r, limit: 2, period: 2, block_for: 5, name: throttle_name)
-        t << 'request-id'
-        t << 'user-id'
-
+      t.throttle!
+      t.throttle!
+      expect {
         t.throttle!
+      }.to raise_error(Prorate::Throttled)
+    end
+
+    it 'with n_tokens of 0 simply keeps track of the throttle but does not trigger it' do
+      t = Prorate::Throttle.new(redis: r, limit: 2, period: 2, block_for: 5, name: throttle_name)
+      t << 'request-id'
+      t << 'user-id'
+
+      expect(t.throttle!(n_tokens: 0)).to eq(2)
+      expect(t.throttle!(n_tokens: 0)).to eq(2)
+      expect(t.throttle!).to eq(1)
+    end
+
+    it 'with n_tokens of 20 immediately triggers, already on the first call' do
+      t = Prorate::Throttle.new(redis: r, limit: 2, period: 2, block_for: 5, name: throttle_name)
+      t << 'request-id'
+      t << 'user-id'
+
+      expect {
+        t.throttle!(n_tokens: 20)
+      }.to raise_error(Prorate::Throttled)
+    end
+
+    it 'with a negative n_tokens keeps remaining calls at limit: value even if it would go above' do
+      t = Prorate::Throttle.new(redis: r, limit: 8, period: 2, block_for: 5, name: throttle_name)
+      t << 'some-id'
+
+      expect(t.throttle!(n_tokens: 0)).to eq(8)
+      expect(t.throttle!(n_tokens: -2)).to eq(8)
+      expect(t.throttle!(n_tokens: 1)).to eq(7)
+    end
+
+    it 'with a negative n_tokens allows "dripping" one token out' do
+      t = Prorate::Throttle.new(redis: r, limit: 8, period: 2, block_for: 5, name: throttle_name)
+      t << 'some-id'
+
+      expect(t.throttle!(n_tokens: 0)).to eq(8)
+      expect(t.throttle!(n_tokens: 1)).to eq(7)
+      expect(t.throttle!(n_tokens: -1)).to eq(8)
+    end
+
+    it 'uses the given parameters to differentiate between users' do
+      4.times { |i|
+        t = Prorate::Throttle.new(redis: r, limit: 3, period: 2, block_for: 2, name: throttle_name)
+        t << i
+        3.times { t.throttle! }
+      }
+    end
+
+    it 'applies a long block, even if the rolling window for the throttle is shorter' do
+      # Exhaust the request limit
+      t = Prorate::Throttle.new(redis: r, limit: 4, period: 1, block_for: 60, name: throttle_name)
+      4.times do
         t.throttle!
-        expect {
-          t.throttle!
-        }.to raise_error(Prorate::Throttled)
       end
 
-      it 'with n_tokens of 0 simply keeps track of the throttle but does not trigger it' do
-        t = Prorate::Throttle.new(redis: r, limit: 2, period: 2, block_for: 5, name: throttle_name)
-        t << 'request-id'
-        t << 'user-id'
+      expect {
+        t.throttle!
+      }.to raise_error(Prorate::Throttled)
 
-        expect(t.throttle!(n_tokens: 0)).to eq(2)
-        expect(t.throttle!(n_tokens: 0)).to eq(2)
-        expect(t.throttle!).to eq(1)
+      sleep 1.5 # The counters have expired and the rolling window has passed, but the block is still set
+
+      expect {
+        t.throttle!
+      }.to raise_error(Prorate::Throttled)
+    end
+
+    it 'raises an error if the block is triggered, and then releases it after block_for seconds' do
+      # Exhaust the request limit
+      4.times do
+        t = Prorate::Throttle.new(redis: r, limit: 4, period: 1, block_for: 2, name: throttle_name)
+        t.throttle!
       end
-
-      it 'with n_tokens of 20 immediately triggers, already on the first call' do
-        t = Prorate::Throttle.new(redis: r, limit: 2, period: 2, block_for: 5, name: throttle_name)
-        t << 'request-id'
-        t << 'user-id'
-
-        expect {
-          t.throttle!(n_tokens: 20)
-        }.to raise_error(Prorate::Throttled)
-      end
-
-      it 'with a negative n_tokens keeps remaining calls at limit: value even if it would go above' do
-        t = Prorate::Throttle.new(redis: r, limit: 8, period: 2, block_for: 5, name: throttle_name)
-        t << 'some-id'
-
-        expect(t.throttle!(n_tokens: 0)).to eq(8)
-        expect(t.throttle!(n_tokens: -2)).to eq(8)
-        expect(t.throttle!(n_tokens: 1)).to eq(7)
-      end
-
-      it 'with a negative n_tokens allows "dripping" one token out' do
-        t = Prorate::Throttle.new(redis: r, limit: 8, period: 2, block_for: 5, name: throttle_name)
-        t << 'some-id'
-
-        expect(t.throttle!(n_tokens: 0)).to eq(8)
-        expect(t.throttle!(n_tokens: 1)).to eq(7)
-        expect(t.throttle!(n_tokens: -1)).to eq(8)
-      end
-
-      it 'uses the given parameters to differentiate between users' do
-        4.times { |i|
-          t = Prorate::Throttle.new(redis: r, limit: 3, period: 2, block_for: 2, name: throttle_name)
-          t << i
-          3.times { t.throttle! }
-        }
-      end
-
-      it 'applies a long block, even if the rolling window for the throttle is shorter' do
-        # Exhaust the request limit
-        t = Prorate::Throttle.new(redis: r, limit: 4, period: 1, block_for: 60, name: throttle_name)
-        4.times do
-          t.throttle!
-        end
-
-        expect {
-          t.throttle!
-        }.to raise_error(Prorate::Throttled)
-
-        sleep 1.5 # The counters have expired and the rolling window has passed, but the block is still set
-
-        expect {
-          t.throttle!
-        }.to raise_error(Prorate::Throttled)
-      end
-
-      it 'raises an error if the block is triggered, and then releases it after block_for seconds' do
-        # Exhaust the request limit
-        4.times do
-          t = Prorate::Throttle.new(redis: r, limit: 4, period: 1, block_for: 2, name: throttle_name)
-          t.throttle!
-        end
-        # bucket is now full; next request will overflow it
-        expect {
-          t = Prorate::Throttle.new(redis: r, limit: 4, period: 1, block_for: 1, name: throttle_name)
-          t.throttle!
-        }.to raise_error(Prorate::Throttled)
-
-        sleep 1.5
-
-        # This one should pass again
+      # bucket is now full; next request will overflow it
+      expect {
         t = Prorate::Throttle.new(redis: r, limit: 4, period: 1, block_for: 1, name: throttle_name)
         t.throttle!
+      }.to raise_error(Prorate::Throttled)
+
+      sleep 1.5
+
+      # This one should pass again
+      t = Prorate::Throttle.new(redis: r, limit: 4, period: 1, block_for: 1, name: throttle_name)
+      t.throttle!
+    end
+
+    it 'logs all the things' do
+      # Only require it now so that if we happen to attempt to instantiate a logger elsewhere
+      # we have the potential of having the test fail. Prorate should not require logger.rb by itself
+      require 'logger'
+
+      buf = StringIO.new
+      logger = Logger.new(buf)
+      logger.level = 0
+      t = Prorate::Throttle.new(redis: r, logger: logger, limit: 64, period: 15, block_for: 30, name: throttle_name)
+      expect(logger).to receive(:debug).exactly(32).times.and_call_original
+      32.times { t.throttle! }
+      expect(buf.string).not_to be_empty
+    end
+
+    it 'loads the lua script into Redis if necessary' do
+      r.script(:flush)
+      t = Prorate::Throttle.new(redis: r, limit: 30, period: 10, block_for: 2, name: throttle_name)
+      expect(r).to receive(:evalsha).exactly(2).times.and_call_original
+      expect {
+        t.throttle!
+      }.not_to raise_error
+    end
+
+    it 'does not keep keys around for longer than necessary' do
+      t = Prorate::Throttle.new(redis: r, limit: 2, period: 2, block_for: 3, name: throttle_name)
+
+      discriminator_string = Digest::SHA1.hexdigest(Marshal.dump([throttle_name]))
+      bucket_key = throttle_name + ':' + discriminator_string + '.bucket_level'
+      last_updated_key = throttle_name + ':' + discriminator_string + '.last_updated'
+      block_key = throttle_name + ':' + discriminator_string + '.block'
+
+      # At the start all key should be empty
+      expect(r.get(bucket_key)).to be_nil
+      expect(r.get(last_updated_key)).to be_nil
+      expect(r.get(block_key)).to be_nil
+
+      2.times do
+        t.throttle!
       end
 
-      it 'logs all the things' do
-        # Only require it now so that if we happen to attempt to instantiate a logger elsewhere
-        # we have the potential of having the test fail. Prorate should not require logger.rb by itself
-        require 'logger'
-
-        buf = StringIO.new
-        logger = Logger.new(buf)
-        logger.level = 0
-        t = Prorate::Throttle.new(redis: r, logger: logger, limit: 64, period: 15, block_for: 30, name: throttle_name)
-        expect(logger).to receive(:debug).exactly(32).times.and_call_original
-        32.times { t.throttle! }
-        expect(buf.string).not_to be_empty
-      end
-
-      it 'loads the lua script into Redis if necessary' do
-        r.script(:flush)
-        t = Prorate::Throttle.new(redis: r, limit: 30, period: 10, block_for: 2, name: throttle_name)
-        expect(r).to receive(:evalsha).exactly(2).times.and_call_original
-        expect {
-          t.throttle!
-        }.not_to raise_error
-      end
-
-      it 'does not keep keys around for longer than necessary' do
-        t = Prorate::Throttle.new(redis: r, limit: 2, period: 2, block_for: 3, name: throttle_name)
-
-        discriminator_string = Digest::SHA1.hexdigest(Marshal.dump([throttle_name]))
-        bucket_key = throttle_name + ':' + discriminator_string + '.bucket_level'
-        last_updated_key = throttle_name + ':' + discriminator_string + '.last_updated'
-        block_key = throttle_name + ':' + discriminator_string + '.block'
-
-        # At the start all key should be empty
-        expect(r.get(bucket_key)).to be_nil
-        expect(r.get(last_updated_key)).to be_nil
-        expect(r.get(block_key)).to be_nil
-
-        2.times do
-          t.throttle!
-        end
-
-        # We are not blocked yet
-        expect(r.get(bucket_key)).not_to be_nil
-        expect(r.get(last_updated_key)).not_to be_nil
-        expect(r.get(block_key)).to be_nil
-        expect {
-          t.throttle!
-        }.to raise_error(Prorate::Throttled)
-        # Now the block key should be set as well, and the other two should still be set
-        expect(r.get(bucket_key)).not_to be_nil
-        expect(r.get(last_updated_key)).not_to be_nil
-        expect(r.get(block_key)).not_to be_nil
-        sleep 2.2
-        # After <period> time elapses without anything happening, the keys can be deleted.
-        # the block should still be there though
-        expect(r.get(bucket_key)).to be_nil
-        expect(r.get(last_updated_key)).to be_nil
-        expect(r.get(block_key)).not_to be_nil
-        sleep 1
-        # Now the block should be gone as well
-        expect(r.get(bucket_key)).to be_nil
-        expect(r.get(last_updated_key)).to be_nil
-        expect(r.get(block_key)).to be_nil
-      end
+      # We are not blocked yet
+      expect(r.get(bucket_key)).not_to be_nil
+      expect(r.get(last_updated_key)).not_to be_nil
+      expect(r.get(block_key)).to be_nil
+      expect {
+        t.throttle!
+      }.to raise_error(Prorate::Throttled)
+      # Now the block key should be set as well, and the other two should still be set
+      expect(r.get(bucket_key)).not_to be_nil
+      expect(r.get(last_updated_key)).not_to be_nil
+      expect(r.get(block_key)).not_to be_nil
+      sleep 2.2
+      # After <period> time elapses without anything happening, the keys can be deleted.
+      # the block should still be there though
+      expect(r.get(bucket_key)).to be_nil
+      expect(r.get(last_updated_key)).to be_nil
+      expect(r.get(block_key)).not_to be_nil
+      sleep 1
+      # Now the block should be gone as well
+      expect(r.get(bucket_key)).to be_nil
+      expect(r.get(last_updated_key)).to be_nil
+      expect(r.get(block_key)).to be_nil
     end
 
     it 'provides attribute readers for the Throttle constructor keyword arguments' do
