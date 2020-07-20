@@ -26,9 +26,9 @@ describe Prorate::LeakyBucket do
         bucket = described_class.new(redis: pool, redis_key_prefix: bucket_name, leak_rate: 0.8, bucket_capacity: 2)
 
         # Nothing should be written into Redis just when creating the object in Ruby
-        pool.with do |r|
-          expect(r.get(bucket.leaky_bucket_key)).to be_nil
-          expect(r.get(bucket.last_updated_key)).to be_nil
+        pool.with do |redis|
+          expect(redis.get(bucket.leaky_bucket_key)).to be_nil
+          expect(redis.get(bucket.last_updated_key)).to be_nil
         end
       end
     end
