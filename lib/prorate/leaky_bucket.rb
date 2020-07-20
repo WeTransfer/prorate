@@ -60,7 +60,7 @@ module Prorate
     #   If your bucket is specific to a user, a browser or an IP address you need to mix in
     #   those values into the key prefix as appropriate.
     # @param leak_rate[Float] the leak rate of the bucket, in tokens per second
-    # @param redis[Redis,#with] a Redis connection or a ConnectonPool instance
+    # @param redis[Redis,#with] a Redis connection or a ConnectionPool instance
     #   if you are using the connection_pool gem. With a connection pool Prorate will
     #   checkout a connection using `#with` and check it in when it's done.
     # @param bucket_capacity[Numeric] how many tokens is the bucket capped at.
@@ -70,7 +70,7 @@ module Prorate
     #   of 12, and will then immediately start leaking again.
     def initialize(redis_key_prefix:, leak_rate:, redis:, bucket_capacity:)
       @redis_key_prefix = redis_key_prefix
-      @redis = NullPool.new(redis) unless redis.respond_to?(:with)
+      @redis = redis.respond_to?(:with) ? redis : NullPool.new(redis)
       @leak_rate = leak_rate.to_f
       @capacity = bucket_capacity.to_f
     end

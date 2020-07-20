@@ -1,5 +1,6 @@
 require 'spec_helper'
 require 'securerandom'
+require 'connection_pool'
 
 describe Prorate::LeakyBucket do
   describe 'in a happy path' do
@@ -16,10 +17,24 @@ describe Prorate::LeakyBucket do
       end.pack("C*")
     }
 
+    let(:bucket_name) { generate_random_bucket_name.call }
+    let(:r) { Redis.new }
+
+    context 'with a connection pool' do
+      it 'initializes the bucket with no keys' do
+        pool = ConnectionPool.new { r }
+        bucket = described_class.new(redis: pool, redis_key_prefix: bucket_name, leak_rate: 0.8, bucket_capacity: 2)
+
+        # Nothing should be written into Redis just when creating the object in Ruby
+        pool.with do |redis|
+          expect(redis.get(bucket.leaky_bucket_key)).to be_nil
+          expect(redis.get(bucket.last_updated_key)).to be_nil
+        end
+      end
+    end
+
     25.times do |n|
       it "on iteration #{n} accepts the number of tokens and returns the new bucket level" do
-        bucket_name = generate_random_bucket_name.call
-        r = Redis.new
         bucket = described_class.new(redis: r, redis_key_prefix: bucket_name, leak_rate: 0.8, bucket_capacity: 2)
 
         # Nothing should be written into Redis just when creating the object in Ruby
