@@ -70,7 +70,7 @@ module Prorate
     #   of 12, and will then immediately start leaking again.
     def initialize(redis_key_prefix:, leak_rate:, redis:, bucket_capacity:)
       @redis_key_prefix = redis_key_prefix
-      @redis = NullPool.new(redis) unless redis.respond_to?(:with)
+      @redis = redis.respond_to?(:with) ? redis : NullPool.new(redis)
       @leak_rate = leak_rate.to_f
       @capacity = bucket_capacity.to_f
     end
