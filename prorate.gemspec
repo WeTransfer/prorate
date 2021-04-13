@@ -34,5 +34,5 @@ Gem::Specification.new do |spec|
   spec.add_development_dependency "rspec", "~> 3.0"
   spec.add_development_dependency 'wetransfer_style', '0.6.5'
   spec.add_development_dependency 'yard', '~> 0.9'
-  spec.add_development_dependency 'pry', '~> 0.13.1'
+  spec.add_development_dependency 'pry', '~> 0.14.1'
 end
