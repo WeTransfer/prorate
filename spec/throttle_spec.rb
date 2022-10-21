@@ -111,7 +111,7 @@ describe Prorate::Throttle do
         3.times { t.throttle! }
       }
     end
-    
+
     it 'applies a long block, even if the rolling window for the throttle is shorter' do
       # Exhaust the request limit
       t = Prorate::Throttle.new(redis: r, limit: 4, period: 1, block_for: 60, name: throttle_name)
