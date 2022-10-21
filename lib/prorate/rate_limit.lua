@@ -31,7 +31,8 @@ local key_lifetime = math.ceil(max_bucket_capacity / leak_rate)
 
 local blocked_until = redis.call("GET", block_key)
 if blocked_until then
-  return {(tonumber(blocked_until) - now), 0}
+  -- see https://redis.io/docs/manual/programmability/lua-api/ : floats should be returned as strings or they will be cast into integers
+  return {(tostring(tonumber(blocked_until) - now)), -1}
 end
 
 -- get current bucket level. The throttle key might not exist yet in which
@@ -49,7 +50,7 @@ if (new_bucket_level + n_tokens) <= max_bucket_capacity then
   retval = {0, math.ceil(new_bucket_level)}
 else
   redis.call("SETEX", block_key, block_duration, now + block_duration)
-  retval = {block_duration, 0}
+  retval = {tostring(block_duration), -1}
 end
 
 -- Save the new bucket level
