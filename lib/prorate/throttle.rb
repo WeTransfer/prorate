@@ -95,7 +95,7 @@ module Prorate
         block_for: @block_for,
         n_tokens: n_tokens)
 
-      if remaining_block_time > 0
+      if bucket_level == -1
         @logger.warn do
           "Throttle %s exceeded limit of %d in %d seconds and is blocked for the next %d seconds" % [@name, @limit, @period, remaining_block_time]
         end

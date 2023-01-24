@@ -55,6 +55,17 @@ describe Prorate::Throttle do
       }.to raise_error(Prorate::Throttled)
     end
 
+    it 'throttles and raises multiple consecutive exceptions' do
+      t = Prorate::Throttle.new(redis: r, limit: 1, period: 10, block_for: 1, name: throttle_name)
+      t.throttle!
+      expect {
+        t.throttle!
+      }.to raise_error(Prorate::Throttled)
+      expect {
+        t.throttle!
+      }.to raise_error(Prorate::Throttled)
+    end
+
     it 'with n_tokens of 0 simply keeps track of the throttle but does not trigger it' do
       t = Prorate::Throttle.new(redis: r, limit: 2, period: 2, block_for: 5, name: throttle_name)
       t << 'request-id'
