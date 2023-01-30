@@ -97,7 +97,7 @@ module Prorate
 
       if bucket_level == -1
         @logger.warn do
-          "Throttle %s exceeded limit of %d in %d seconds and is blocked for the next %d seconds" % [@name, @limit, @period, remaining_block_time]
+          "Throttle %s exceeded limit of %d in %d seconds and is blocked for the next %s seconds" % [@name, @limit, @period, remaining_block_time]
         end
         raise ::Prorate::Throttled.new(@name, remaining_block_time)
       end
