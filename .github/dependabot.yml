@@ -1,0 +1,16 @@
+---
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: daily
+      time: "10:00"
+      timezone: Europe/Amsterdam
+  - package-ecosystem: bundler
+    directory: /
+    registries: "*"
+    schedule:
+      interval: daily
+      time: "09:00"
+      timezone: Europe/Amsterdam
