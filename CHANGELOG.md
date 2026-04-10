@@ -1,3 +1,9 @@
+# 0.8.0
+
+* Remove `redis.replicate_commands()` from Lua scripts for Redis 7.2+ compatibility.
+  This call was required for Redis < 5.0 and has been removed in Redis 7.2.
+* Require `redis` gem >= 4 (previously >= 2). Versions 2.x and 3.x are no longer maintained.
+
 # 0.7.1
 
 * Fix use of a ConnectionPool as `redis:` argument which was broken in 0.7.0
