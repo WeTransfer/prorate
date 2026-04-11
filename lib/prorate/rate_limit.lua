@@ -4,8 +4,6 @@
 -- if the block time is nonzero, the second integer is always zero. If the block time is zero,
 -- the second integer indicates the level of the bucket
 
--- this is required to be able to use TIME and writes; basically it lifts the script into IO
-redis.replicate_commands()
 -- make some nicer looking variable names:
 local retval = nil
 

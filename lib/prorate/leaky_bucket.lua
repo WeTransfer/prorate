@@ -2,9 +2,6 @@
 -- args: key_base, leak_rate, bucket_ttl, fillup. To just verify the state of the bucket leak_rate of 0 may be passed.
 -- returns: the leve of the bucket in number of tokens
 
--- this is required to be able to use TIME and writes; basically it lifts the script into IO
-redis.replicate_commands()
-
 -- Redis documentation recommends passing the keys separately so that Redis
 -- can - in the future - verify that they live on the same shard of a cluster, and
 -- raise an error if they are not. As far as can be understood this functionality is not
